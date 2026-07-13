@@ -73,6 +73,13 @@ def main() -> None:
     rows = preview_catalog(args.catalog, args.rows)
     print(f"Catalog: {args.catalog}")
     print(f"Showing {len(rows)} rows and {len(rows.colnames)} columns\n")
+
+    # Number columns from 1 to make it easy to refer to them during analysis.
+    print("Column numbers and names:")
+    for column_number, column_name in enumerate(rows.colnames, start=1):
+        print(f"{column_number:>3}: {column_name}")
+
+    print("\nFirst rows:")
     rows.pprint(max_lines=-1, max_width=-1)
 
 
