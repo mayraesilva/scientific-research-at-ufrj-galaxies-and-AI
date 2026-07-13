@@ -119,4 +119,9 @@ This repository is maintained by an undergraduate Physics student pursuing a bac
 
 **Research Advisor:** Professor Arianna Cortesi
 
+### Contact
+
+- **Student:** [mayraeduarda2002@gmail.com](mailto:mayraeduarda2002@gmail.com)
+- **Research Advisor:** [aricorte@gmail.com](mailto:aricorte@gmail.com)
+
 *Viva a ciência brasileira!* 🇧🇷🔬
