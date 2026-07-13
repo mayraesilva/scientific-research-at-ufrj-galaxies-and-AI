@@ -3,6 +3,8 @@
 from argparse import ArgumentParser
 from pathlib import Path
 
+import matplotlib.pyplot as plt
+import numpy as np
 from astropy.io import fits
 from astropy.table import Table
 
@@ -43,6 +45,36 @@ def preview_catalog(path: Path, row_count: int) -> Table:
     return rows
 
 
+def plot_magnitude_vs_flux_radius(rows: Table) -> plt.Figure:
+    """Create a scatter plot of R-band magnitude against flux radius."""
+    # Convert the two catalog columns to NumPy arrays so invalid values can be
+    # removed before plotting.
+    magnitude = np.asarray(rows["MAG_AUTO_R"], dtype=float)
+    flux_radius = np.asarray(rows["FLUX_RADIUS_R"], dtype=float)
+    valid = np.isfinite(magnitude) & np.isfinite(flux_radius)
+
+    if not np.any(valid):
+        raise ValueError("No valid MAG_AUTO_R and FLUX_RADIUS_R pairs to plot.")
+
+    # Each point represents one galaxy from the rows selected for the preview.
+    figure, axis = plt.subplots(figsize=(9, 6))
+    axis.scatter(
+        magnitude[valid],
+        flux_radius[valid],
+        alpha=0.7,
+        edgecolors="none",
+    )
+    axis.set_title("R-band magnitude versus flux radius")
+    axis.set_xlabel("MAG_AUTO_R")
+    axis.set_ylabel("FLUX_RADIUS_R")
+    axis.grid(alpha=0.25)
+
+    # Astronomical magnitudes run backwards: smaller values are brighter.
+    axis.invert_xaxis()
+    figure.tight_layout()
+    return figure
+
+
 def main() -> None:
     # Define command-line options. The catalog path is optional because this
     # project already has a known default location for the data file.
@@ -59,6 +91,11 @@ def main() -> None:
         type=int,
         default=50,
         help="Number of rows to display (default: 50)",
+    )
+    parser.add_argument(
+        "--save-plot",
+        type=Path,
+        help="Save the graph to this path instead of opening a graph window",
     )
     args = parser.parse_args()
 
@@ -81,6 +118,17 @@ def main() -> None:
 
     print("\nFirst rows:")
     rows.pprint(max_lines=-1, max_width=-1)
+
+    # Create the requested MAG_AUTO_R versus FLUX_RADIUS_R graph. By default it
+    # opens in a window; --save-plot makes non-interactive use possible.
+    print("\nGraph: MAG_AUTO_R versus FLUX_RADIUS_R")
+    figure = plot_magnitude_vs_flux_radius(rows)
+    if args.save_plot:
+        args.save_plot.parent.mkdir(parents=True, exist_ok=True)
+        figure.savefig(args.save_plot, dpi=150)
+        print(f"Graph saved to: {args.save_plot}")
+    else:
+        plt.show()
 
 
 if __name__ == "__main__":
