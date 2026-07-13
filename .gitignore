@@ -2,3 +2,4 @@ data/DES_DR1_CNN_morphological_catalog.fit
 __pycache__/
 scientific-research/
 graphs/*.png
+docs/articles/pdfs/*.pdf
