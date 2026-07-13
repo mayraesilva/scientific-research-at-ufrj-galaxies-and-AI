@@ -29,6 +29,31 @@ DEFAULT_HEATMAP = (
     / "graphs"
     / "mag_auto_r_vs_flux_radius_r_heatmap.png"
 )
+DEFAULT_CONFIDENCE_HISTOGRAM = (
+    Path(__file__).resolve().parents[1]
+    / "graphs"
+    / "neural_network_confidence_histogram.png"
+)
+DEFAULT_MORPHOLOGY_RELATION = (
+    Path(__file__).resolve().parents[1]
+    / "graphs"
+    / "magnitude_size_by_morphology.png"
+)
+DEFAULT_FAINTNESS_BIAS = (
+    Path(__file__).resolve().parents[1]
+    / "graphs"
+    / "classification_bias_vs_faintness.png"
+)
+DEFAULT_EDGE_ON_CORRELATION = (
+    Path(__file__).resolve().parents[1]
+    / "graphs"
+    / "edge_on_disk_correlation.png"
+)
+DEFAULT_SKY_MAP = (
+    Path(__file__).resolve().parents[1]
+    / "graphs"
+    / "sky_distribution_map.png"
+)
 
 
 def first_table_hdu(hdul: fits.HDUList) -> int:
@@ -58,19 +83,22 @@ def preview_catalog(path: Path, row_count: int) -> Table:
     return rows
 
 
-def read_graph_columns(path: Path, row_count: int) -> tuple[np.ndarray, np.ndarray]:
-    """Read only the magnitude and flux-radius columns needed by the graphs."""
-    # Selecting columns before converting to NumPy avoids copying all 19
-    # catalog columns when the larger heatmap sample is loaded.
+def read_catalog_columns(
+    path: Path,
+    column_names: tuple[str, ...],
+    row_count: int,
+) -> dict[str, np.ndarray]:
+    """Read selected FITS columns without copying the entire catalog."""
+    # Selecting columns before copying avoids loading all 19 catalog columns
+    # when the larger analysis sample is used to create graphs.
     with fits.open(path, mode="readonly", memmap=True) as hdul:
         table_data = hdul[first_table_hdu(hdul)].data
-        magnitude = np.asarray(table_data["MAG_AUTO_R"][:row_count], dtype=float)
-        flux_radius = np.asarray(
-            table_data["FLUX_RADIUS_R"][:row_count],
-            dtype=float,
-        )
+        columns = {
+            name: np.array(table_data[name][:row_count], copy=True)
+            for name in column_names
+        }
 
-    return magnitude, flux_radius
+    return columns
 
 
 def valid_graph_values(
@@ -141,6 +169,277 @@ def plot_density_heatmap(
     return figure
 
 
+def plot_neural_network_confidence_histogram(
+    probabilities: np.ndarray,
+    probability_column: str = "MP_LTG",
+) -> plt.Figure:
+    """Plot the distribution of a neural-network confidence column."""
+    probabilities = np.asarray(probabilities, dtype=float)
+    valid = np.isfinite(probabilities) & (probabilities >= 0) & (probabilities <= 1)
+    probabilities = probabilities[valid]
+    if probabilities.size == 0:
+        raise ValueError(f"No valid probabilities found in {probability_column}.")
+
+    # A logarithmic count axis shows both the large peaks near confident
+    # predictions and the smaller population of ambiguous classifications.
+    figure, axis = plt.subplots(figsize=(9, 6))
+    axis.hist(
+        probabilities,
+        bins=50,
+        range=(0, 1),
+        color="slateblue",
+        edgecolor="white",
+        linewidth=0.4,
+        log=True,
+    )
+    axis.set_title(f"Neural network confidence distribution: {probability_column}")
+    axis.set_xlabel(f"{probability_column} probability")
+    axis.set_ylabel("Galaxy count (log scale)")
+    axis.set_xlim(0, 1)
+    axis.grid(axis="y", alpha=0.25)
+    figure.tight_layout()
+    return figure
+
+
+def plot_magnitude_size_by_morphology(
+    magnitude: np.ndarray,
+    flux_radius: np.ndarray,
+    morphology_flag: np.ndarray,
+) -> plt.Figure:
+    """Plot the magnitude-size relation separated into LTG and ETG classes."""
+    magnitude = np.asarray(magnitude, dtype=float)
+    flux_radius = np.asarray(flux_radius, dtype=float)
+    morphology_flag = np.asarray(morphology_flag)
+    valid = (
+        np.isfinite(magnitude)
+        & np.isfinite(flux_radius)
+        & np.isfinite(morphology_flag)
+    )
+    if not np.any(valid):
+        raise ValueError("No valid magnitude, size, and morphology rows to plot.")
+
+    magnitude = magnitude[valid]
+    flux_radius = flux_radius[valid]
+    morphology_flag = morphology_flag[valid].astype(int)
+
+    # The catalogue defines even FLAG_LTG values (0, 2, 4) as ETGs and odd
+    # values (1, 3, 5) as LTGs. The higher flag values indicate more robust
+    # classifications, but parity always identifies the morphology class.
+    is_ltg = morphology_flag % 2 == 1
+    is_etg = ~is_ltg
+
+    figure, axis = plt.subplots(figsize=(9, 6))
+    axis.scatter(
+        magnitude[is_ltg],
+        flux_radius[is_ltg],
+        s=3,
+        alpha=0.25,
+        color="tab:blue",
+        edgecolors="none",
+        label="LTG / Spiral",
+        rasterized=True,
+    )
+    axis.scatter(
+        magnitude[is_etg],
+        flux_radius[is_etg],
+        s=3,
+        alpha=0.25,
+        color="tab:red",
+        edgecolors="none",
+        label="ETG / non-LTG",
+        rasterized=True,
+    )
+    axis.set_title("Magnitude-size relation separated by morphology")
+    axis.set_xlabel("MAG_AUTO_R")
+    axis.set_ylabel("FLUX_RADIUS_R")
+    axis.invert_xaxis()
+    axis.legend(markerscale=4)
+    axis.grid(alpha=0.2)
+    figure.tight_layout()
+    return figure
+
+
+def plot_classification_bias_against_faintness(
+    magnitude: np.ndarray,
+    ltg_probability: np.ndarray,
+) -> plt.Figure:
+    """Plot LTG probability density as a function of apparent magnitude."""
+    magnitude, ltg_probability = valid_graph_values(magnitude, ltg_probability)
+    in_probability_range = (ltg_probability >= 0) & (ltg_probability <= 1)
+    magnitude = magnitude[in_probability_range]
+    ltg_probability = ltg_probability[in_probability_range]
+    if magnitude.size == 0:
+        raise ValueError("No valid magnitude and MP_LTG pairs to plot.")
+
+    # The catalog is large, so logarithmic hexbin density is more legible than
+    # drawing thousands of overlapping scatter points. Magnitude increases to
+    # the right here so the direction of increasing faintness remains clear.
+    figure, axis = plt.subplots(figsize=(9, 6))
+    density = axis.hexbin(
+        magnitude,
+        ltg_probability,
+        gridsize=70,
+        bins="log",
+        mincnt=1,
+        cmap="magma",
+    )
+    axis.set_title("LTG classification probability versus faintness")
+    axis.set_xlabel("MAG_AUTO_R (fainter galaxies toward the right)")
+    axis.set_ylabel("MP_LTG")
+    axis.set_ylim(0, 1)
+    colorbar = figure.colorbar(density, ax=axis)
+    colorbar.set_label("Galaxy count per bin (log scale)")
+    figure.tight_layout()
+    return figure
+
+
+def plot_edge_on_disk_correlation(
+    ltg_probability: np.ndarray,
+    edge_on_probability: np.ndarray,
+) -> plt.Figure:
+    """Plot the density relation between LTG and edge-on probabilities."""
+    ltg_probability, edge_on_probability = valid_graph_values(
+        ltg_probability,
+        edge_on_probability,
+    )
+    valid_probability = (
+        (ltg_probability >= 0)
+        & (ltg_probability <= 1)
+        & (edge_on_probability >= 0)
+        & (edge_on_probability <= 1)
+    )
+    ltg_probability = ltg_probability[valid_probability]
+    edge_on_probability = edge_on_probability[valid_probability]
+    if ltg_probability.size == 0:
+        raise ValueError("No valid MP_LTG and MP_EdgeOn pairs to plot.")
+
+    # A density plot makes clusters near probability boundaries visible without
+    # hiding them beneath a large number of overlapping scatter points.
+    figure, axis = plt.subplots(figsize=(8, 7))
+    density = axis.hexbin(
+        ltg_probability,
+        edge_on_probability,
+        gridsize=65,
+        bins="log",
+        mincnt=1,
+        cmap="cividis",
+    )
+    axis.set_title("Edge-on disk probability correlation")
+    axis.set_xlabel("MP_LTG")
+    axis.set_ylabel("MP_EdgeOn")
+    axis.set_xlim(0, 1)
+    axis.set_ylim(0, 1)
+    colorbar = figure.colorbar(density, ax=axis)
+    colorbar.set_label("Galaxy count per bin (log scale)")
+    figure.tight_layout()
+    return figure
+
+
+def plot_sky_distribution(
+    right_ascension: np.ndarray,
+    declination: np.ndarray,
+) -> plt.Figure:
+    """Plot the catalog's sky coverage in right ascension and declination."""
+    right_ascension, declination = valid_graph_values(
+        right_ascension,
+        declination,
+    )
+
+    # Tiny, partially transparent points reveal the survey footprint while
+    # keeping dense areas from turning into a single opaque block.
+    figure, axis = plt.subplots(figsize=(11, 6))
+    axis.scatter(
+        right_ascension,
+        declination,
+        s=0.25,
+        alpha=0.35,
+        color="midnightblue",
+        edgecolors="none",
+        rasterized=True,
+    )
+    axis.set_title("Sky distribution of catalog galaxies")
+    axis.set_xlabel("Right Ascension (degrees)")
+    axis.set_ylabel("Declination (degrees)")
+    axis.set_xlim(0, 360)
+    axis.grid(alpha=0.2)
+    figure.tight_layout()
+    return figure
+
+
+def save_graph(figure: plt.Figure, output_path: Path) -> Path:
+    """Save a graph to a stable path, replacing an older version if present."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, dpi=150)
+    plt.close(figure)
+    return output_path
+
+
+def create_catalog_analysis_graphs(
+    catalog_path: Path,
+    row_count: int = 100_000,
+    heatmap_path: Path = DEFAULT_HEATMAP,
+) -> dict[str, Path]:
+    """Create and save the catalog-wide analysis graphs for a row sample."""
+    required_columns = (
+        "RA",
+        "DEC",
+        "MAG_AUTO_R",
+        "FLUX_RADIUS_R",
+        "MP_LTG",
+        "MP_EdgeOn",
+        "FLAG_LTG",
+    )
+    columns = read_catalog_columns(catalog_path, required_columns, row_count)
+
+    # Build each figure through a dedicated reusable function. Fixed output
+    # names cause subsequent runs to update rather than duplicate the graphs.
+    figures_and_paths = {
+        "Magnitude-radius density heatmap": (
+            plot_density_heatmap(
+                columns["MAG_AUTO_R"],
+                columns["FLUX_RADIUS_R"],
+            ),
+            heatmap_path,
+        ),
+        "Neural network confidence histogram": (
+            plot_neural_network_confidence_histogram(columns["MP_LTG"]),
+            DEFAULT_CONFIDENCE_HISTOGRAM,
+        ),
+        "Magnitude-size relation by morphology": (
+            plot_magnitude_size_by_morphology(
+                columns["MAG_AUTO_R"],
+                columns["FLUX_RADIUS_R"],
+                columns["FLAG_LTG"],
+            ),
+            DEFAULT_MORPHOLOGY_RELATION,
+        ),
+        "Classification bias against faintness": (
+            plot_classification_bias_against_faintness(
+                columns["MAG_AUTO_R"],
+                columns["MP_LTG"],
+            ),
+            DEFAULT_FAINTNESS_BIAS,
+        ),
+        "Edge-on disk correlation": (
+            plot_edge_on_disk_correlation(
+                columns["MP_LTG"],
+                columns["MP_EdgeOn"],
+            ),
+            DEFAULT_EDGE_ON_CORRELATION,
+        ),
+        "Sky distribution map": (
+            plot_sky_distribution(columns["RA"], columns["DEC"]),
+            DEFAULT_SKY_MAP,
+        ),
+    }
+
+    saved_graphs = {}
+    for graph_name, (figure, output_path) in figures_and_paths.items():
+        saved_graphs[graph_name] = save_graph(figure, output_path)
+
+    return saved_graphs
+
+
 def main() -> None:
     # Define command-line options. The catalog path is optional because this
     # project already has a known default location for the data file.
@@ -165,10 +464,12 @@ def main() -> None:
         help=f"Graph output path (default: {DEFAULT_GRAPH})",
     )
     parser.add_argument(
+        "--analysis-rows",
         "--heatmap-rows",
+        dest="analysis_rows",
         type=int,
         default=100_000,
-        help="Number of rows used for the density heatmap (default: 100000)",
+        help="Number of rows used for catalog-wide graphs (default: 100000)",
     )
     parser.add_argument(
         "--save-heatmap",
@@ -181,8 +482,8 @@ def main() -> None:
     # Validate user input before attempting to open the large catalog.
     if args.rows < 1:
         parser.error("--rows must be at least 1")
-    if args.heatmap_rows < 1:
-        parser.error("--heatmap-rows must be at least 1")
+    if args.analysis_rows < 1:
+        parser.error("--analysis-rows must be at least 1")
     if not args.catalog.is_file():
         parser.error(f"catalog not found: {args.catalog}")
 
@@ -204,20 +505,19 @@ def main() -> None:
     # existing PNG at this path, preventing duplicates after repeated runs.
     print("\nGraph: MAG_AUTO_R versus FLUX_RADIUS_R")
     figure = plot_magnitude_vs_flux_radius(rows)
-    args.save_plot.parent.mkdir(parents=True, exist_ok=True)
-    figure.savefig(args.save_plot, dpi=150)
-    plt.close(figure)
+    save_graph(figure, args.save_plot)
     print(f"Graph saved to: {args.save_plot}")
 
-    # Use a much larger sample for the density view while loading only the two
-    # necessary columns. The stable output path is overwritten on every run.
-    print(f"\nHeatmap: using up to {args.heatmap_rows} catalog rows")
-    magnitude, flux_radius = read_graph_columns(args.catalog, args.heatmap_rows)
-    heatmap = plot_density_heatmap(magnitude, flux_radius)
-    args.save_heatmap.parent.mkdir(parents=True, exist_ok=True)
-    heatmap.savefig(args.save_heatmap, dpi=150)
-    plt.close(heatmap)
-    print(f"Heatmap saved to: {args.save_heatmap}")
+    # Use a larger sample for the catalog-wide graphs while loading only the
+    # seven required FITS columns. Every graph has a stable output filename.
+    print(f"\nAnalysis graphs: using up to {args.analysis_rows} catalog rows")
+    saved_graphs = create_catalog_analysis_graphs(
+        args.catalog,
+        row_count=args.analysis_rows,
+        heatmap_path=args.save_heatmap,
+    )
+    for graph_name, output_path in saved_graphs.items():
+        print(f"{graph_name} saved to: {output_path}")
 
 
 if __name__ == "__main__":
