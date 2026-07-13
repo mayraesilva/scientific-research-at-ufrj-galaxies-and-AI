@@ -17,6 +17,14 @@ DEFAULT_CATALOG = (
     / "DES_DR1_CNN_morphological_catalog.fit"
 )
 
+# Always use the same output path so rerunning the script replaces the previous
+# graph instead of creating duplicate image files.
+DEFAULT_GRAPH = (
+    Path(__file__).resolve().parents[1]
+    / "graphs"
+    / "mag_auto_r_vs_flux_radius_r.png"
+)
+
 
 def first_table_hdu(hdul: fits.HDUList) -> int:
     """Return the index of the first table extension in a FITS file."""
@@ -95,7 +103,8 @@ def main() -> None:
     parser.add_argument(
         "--save-plot",
         type=Path,
-        help="Save the graph to this path instead of opening a graph window",
+        default=DEFAULT_GRAPH,
+        help=f"Graph output path (default: {DEFAULT_GRAPH})",
     )
     args = parser.parse_args()
 
@@ -119,16 +128,14 @@ def main() -> None:
     print("\nFirst rows:")
     rows.pprint(max_lines=-1, max_width=-1)
 
-    # Create the requested MAG_AUTO_R versus FLUX_RADIUS_R graph. By default it
-    # opens in a window; --save-plot makes non-interactive use possible.
+    # Save the requested graph to a stable filename. Matplotlib overwrites the
+    # existing PNG at this path, preventing duplicates after repeated runs.
     print("\nGraph: MAG_AUTO_R versus FLUX_RADIUS_R")
     figure = plot_magnitude_vs_flux_radius(rows)
-    if args.save_plot:
-        args.save_plot.parent.mkdir(parents=True, exist_ok=True)
-        figure.savefig(args.save_plot, dpi=150)
-        print(f"Graph saved to: {args.save_plot}")
-    else:
-        plt.show()
+    args.save_plot.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(args.save_plot, dpi=150)
+    plt.close(figure)
+    print(f"Graph saved to: {args.save_plot}")
 
 
 if __name__ == "__main__":
