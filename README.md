@@ -117,4 +117,6 @@ pip install -r requirements.txt
 
 This repository is maintained by a student/researcher at the **Universidade Federal do Rio de Janeiro (UFRJ)**, bridging the gap between theoretical astrophysics and modern computational intelligence.
 
+**Research Advisor:** Professor Arianna Cortesi
+
 *Viva a ciência brasileira!* 🇧🇷🔬
