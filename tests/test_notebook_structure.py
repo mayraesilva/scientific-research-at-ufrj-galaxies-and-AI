@@ -44,6 +44,8 @@ def test_configuration_cell_resolves_project_and_reproducibility_constants(monke
     assert namespace["MAX_SEPARATION_ARCSEC"] == 1.0
     assert namespace["FLUX_RADIUS_CUT"] == 50.0
     assert namespace["PLOT_SAMPLE_SIZE"] == 100_000
+    assert namespace["COMPARISON_MAGNITUDE_LIMITS"] == (21.6, 18.0)
+    assert namespace["COMPARISON_RADIUS_LIMITS"] == (2.5, 22.0)
     assert namespace["SUMMARY_HEADERS"] == (
         "catalog", "class", "variable", "n_total", "n_valid", "n_missing",
         "mean", "median", "std_ddof1", "min", "p05", "p25", "p50", "p75",
@@ -110,3 +112,11 @@ def test_notebook_saves_every_required_graph_at_inspection_resolution():
     assert "figure.savefig(path, dpi=150, bbox_inches='tight')" in all_code
     assert all(all_code.count(filename) == 2 for filename in per_catalog)
     assert all(all_code.count(filename) == 1 for filename in comparison)
+
+
+def test_robust_magnitude_radius_figures_use_identical_comparison_limits():
+    notebook = load_notebook()
+    for cell_id in ("magnitude-radius-classes-plot", "highdens-figures"):
+        source = next(cell.source for cell in notebook.cells if cell.id == cell_id)
+        assert "set_xlim(COMPARISON_MAGNITUDE_LIMITS)" in source
+        assert "set_ylim(COMPARISON_RADIUS_LIMITS)" in source
