@@ -55,7 +55,7 @@ The code, notebooks, and models in this repository are deeply inspired by and bu
 ```text
 scientific-research-at-ufrj-galaxies-and-AI/
 │
-├── data/                  # Datasets (ignored in git), catalogs, and image samples (e.g., SDSS, DES subsets)
+├── data/                  # Ignored local catalogs plus a tracked data manifest
 ├── docs/                  # Summaries of papers, literature reviews, and study notes
 ├── notebooks/             # Jupyter notebooks for EDA, model training, and visualization
 │   ├── 01_morfometryka_exploration.ipynb

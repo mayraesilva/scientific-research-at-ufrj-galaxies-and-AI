@@ -1,5 +1,12 @@
-data/DES_DR1_CNN_morphological_catalog.fit
+# Local research data. Catalogues are too large for normal Git history and may
+# have third-party redistribution restrictions; keep only their manifest.
+data/**/*.fit
+data/**/*.fits
 __pycache__/
 scientific-research/
 graphs/*.png
 docs/articles/pdfs/*.pdf
+
+# Local planning notes and operating-system metadata.
+.local/
+.DS_Store
