@@ -28,3 +28,16 @@ def test_notebook_uses_project_kernel_metadata():
     notebook = load_notebook()
     assert notebook.metadata.kernelspec.name == "python3"
     assert notebook.metadata.language_info.name == "python"
+
+
+def test_configuration_cell_resolves_project_and_reproducibility_constants(monkeypatch):
+    monkeypatch.setenv("GALAXY_PROJECT_ROOT", str(Path.cwd()))
+    notebook = load_notebook()
+    source = next(cell.source for cell in notebook.cells if cell.id == "configuration")
+    namespace = {}
+    exec(source, namespace)
+    assert namespace["PROJECT_ROOT"] == Path.cwd().resolve()
+    assert namespace["SEED"] == 20260713
+    assert namespace["MAX_SEPARATION_ARCSEC"] == 1.0
+    assert namespace["FLUX_RADIUS_CUT"] == 50.0
+    assert namespace["PLOT_SAMPLE_SIZE"] == 100_000
