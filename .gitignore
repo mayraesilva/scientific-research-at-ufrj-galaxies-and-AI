@@ -11,3 +11,5 @@ docs/articles/pdfs/*.pdf
 .local/
 .DS_Store
 .worktrees/
+.ipynb_checkpoints/
+outputs/
