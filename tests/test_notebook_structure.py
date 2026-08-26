@@ -36,6 +36,7 @@ def test_configuration_cell_resolves_project_and_reproducibility_constants(monke
     source = next(cell.source for cell in notebook.cells if cell.id == "configuration")
     namespace = {}
     exec(source, namespace)
+    assert namespace["np"].__name__ == "numpy"
     assert namespace["PROJECT_ROOT"] == Path.cwd().resolve()
     assert namespace["SEED"] == 20260713
     assert namespace["MAX_SEPARATION_ARCSEC"] == 1.0
