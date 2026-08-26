@@ -10,3 +10,4 @@ docs/articles/pdfs/*.pdf
 # Local planning notes and operating-system metadata.
 .local/
 .DS_Store
+.worktrees/
