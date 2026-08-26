@@ -1,4 +1,9 @@
-"""Descriptive and classification statistics for morphology catalogues."""
+"""Descriptive and classification statistics for morphology catalogues.
+
+Functions here return immutable rows or NumPy arrays rather than printing or
+writing files.  Keeping calculation separate from notebook presentation makes
+the scientific definitions unit-testable and reusable for both catalogues.
+"""
 
 from dataclasses import dataclass
 from math import sqrt
@@ -8,6 +13,8 @@ import numpy as np
 
 @dataclass(frozen=True)
 class SummaryRow:
+    """Complete finite-value summary for one variable and sample class."""
+
     catalog: str
     class_name: str
     variable: str
@@ -29,6 +36,8 @@ class SummaryRow:
 
 @dataclass(frozen=True)
 class FlagCountRow:
+    """Count, full-catalogue fraction, and Wilson interval for one flag."""
+
     catalog: str
     flag_ltg: int
     class_label: str
@@ -40,6 +49,8 @@ class FlagCountRow:
 
 @dataclass(frozen=True)
 class ThresholdRow:
+    """Sensitivity comparison between one probability cut and flag 5."""
+
     catalog: str
     threshold: float
     n_valid: int
@@ -57,6 +68,8 @@ class ThresholdRow:
 
 @dataclass(frozen=True)
 class ComparisonRow:
+    """Paired catalogue result with differences defined highdens − highlum."""
+
     variable: str
     class_name: str
     highlum_median: float | None
@@ -68,13 +81,19 @@ class ComparisonRow:
 
 
 def wilson_interval(count: int, total: int) -> tuple[float | None, float | None]:
-    """Return the two-sided 95% Wilson interval for a binomial proportion."""
+    """Return the two-sided 95% Wilson interval for a binomial proportion.
+
+    Wilson bounds behave better than ``p ± 1.96*sqrt(p(1-p)/n)`` near zero and
+    one—the exact situation for rare robust LTGs.  ``None`` for an empty
+    population avoids inventing numerical precision where no estimate exists.
+    """
     if total == 0:
         return None, None
     if count < 0 or total < 0 or count > total:
         raise ValueError("count must satisfy 0 <= count <= total")
     z = 1.959963984540054
     proportion = count / total
+    # This is the closed-form Wilson score interval, so SciPy is unnecessary.
     denominator = 1 + z**2 / total
     center = (proportion + z**2 / (2 * total)) / denominator
     half_width = z * sqrt(
@@ -89,12 +108,19 @@ def describe_values(
     variable: str,
     values: np.ndarray,
 ) -> SummaryRow:
-    """Describe finite values with sample dispersion and fixed percentiles."""
+    """Describe finite values with sample dispersion and fixed percentiles.
+
+    Nonfinite values are counted as missing rather than silently influencing
+    results.  Sample standard deviation uses ``ddof=1`` and is deliberately
+    absent when fewer than two valid observations exist.
+    """
     values = np.asarray(values, dtype=float)
     valid = values[np.isfinite(values)]
     n_total = int(values.size)
     n_valid = int(valid.size)
     if n_valid == 0:
+        # Preserve the requested row in output tables even when every value is
+        # missing; absent statistics are represented by None, not string NaN.
         return SummaryRow(catalog, class_name, variable, n_total, 0, n_total, *([None] * 11))
     p05, p25, p50, p75, p95 = np.percentile(valid, [5, 25, 50, 75, 95])
     return SummaryRow(
@@ -119,7 +145,11 @@ def describe_values(
 
 
 def model_dispersion(probabilities: np.ndarray) -> dict[str, np.ndarray]:
-    """Summarize five model probabilities independently for each object."""
+    """Summarize the five model probabilities independently for each object.
+
+    The spread is an inter-model disagreement diagnostic, not a complete
+    uncertainty estimate: the networks may share training data and biases.
+    """
     probabilities = np.asarray(probabilities, dtype=float)
     if probabilities.ndim != 2 or probabilities.shape[1] != 5:
         raise ValueError("probabilities must have shape (rows, 5)")
@@ -132,7 +162,11 @@ def model_dispersion(probabilities: np.ndarray) -> dict[str, np.ndarray]:
 
 
 def flag_count_rows(catalog: str, flags: np.ndarray) -> list[FlagCountRow]:
-    """Count every observed morphology flag with a documented class label."""
+    """Count every observed flag and attach its documented confidence label.
+
+    All flags remain visible even though only 4 and 5 enter the robust sample;
+    this makes the scale of exclusions explicit in tables and bar charts.
+    """
     flags = np.asarray(flags)
     values, counts = np.unique(flags, return_counts=True)
     labels = {
@@ -169,7 +203,12 @@ def threshold_rows(
     flags: np.ndarray,
     thresholds: tuple[float, ...] = (0.5, 0.6, 0.8),
 ) -> list[ThresholdRow]:
-    """Compare probability thresholds with flag 5 as an operational reference."""
+    """Compare probability thresholds with flag 5 as an operational reference.
+
+    The confusion-style cells measure internal catalogue agreement only.  They
+    are retained separately so readers do not mistake one aggregate agreement
+    percentage for validation against independent physical truth.
+    """
     probabilities = np.asarray(probabilities, dtype=float)
     flags = np.asarray(flags)
     valid = np.isfinite(probabilities) & np.isfinite(flags)
@@ -179,6 +218,8 @@ def threshold_rows(
     total = int(probabilities.size)
     rows = []
     for threshold in thresholds:
+        # A positive prediction means an LTG probability at or above the
+        # sensitivity threshold; this never replaces the primary flag rule.
         prediction = probabilities >= threshold
         tp = int(np.count_nonzero(prediction & reference))
         tn = int(np.count_nonzero(~prediction & ~reference))
@@ -209,7 +250,12 @@ def compare_catalog_summaries(
     highlum_rows: list[SummaryRow],
     highdens_rows: list[SummaryRow],
 ) -> list[ComparisonRow]:
-    """Compare matched class summaries with differences defined highdens − highlum."""
+    """Compare class summaries with every difference defined highdens − highlum.
+
+    A single sign convention prevents ambiguous tables.  Class fractions use
+    the corresponding ``all_valid`` row as denominator, while medians remain
+    variable- and class-specific.
+    """
     highdens_by_key = {(row.variable, row.class_name): row for row in highdens_rows}
     highlum_totals = {
         row.variable: row.n_total for row in highlum_rows if row.class_name == "all_valid"
@@ -219,6 +265,7 @@ def compare_catalog_summaries(
     }
     comparisons = []
     for highlum in highlum_rows:
+        # ``all_valid`` supplies denominators; it is not itself a class contrast.
         if highlum.class_name == "all_valid":
             continue
         key = (highlum.variable, highlum.class_name)

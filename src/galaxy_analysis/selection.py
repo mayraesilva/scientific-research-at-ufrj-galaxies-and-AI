@@ -1,4 +1,8 @@
-"""Validation rules and robust morphology selections."""
+"""Validation rules and explicit robust morphology selections.
+
+Centralizing these masks prevents different notebook sections from quietly
+using different class definitions or validity domains.
+"""
 
 from dataclasses import dataclass
 
@@ -7,6 +11,8 @@ import numpy as np
 
 @dataclass(frozen=True)
 class MorphologyMasks:
+    """Disjoint boolean masks for robust and excluded morphology rows."""
+
     robust_etg: np.ndarray
     robust_ltg: np.ndarray
     robust_any: np.ndarray
@@ -15,6 +21,8 @@ class MorphologyMasks:
 
 @dataclass(frozen=True)
 class FilterAuditRow:
+    """One reproducible record of the effect of a validation/filter rule."""
+
     stage: str
     rule: str
     n_before: int
@@ -25,13 +33,20 @@ class FilterAuditRow:
 
 @dataclass(frozen=True)
 class SeparationValidation:
+    """Summary of whether coordinate matches satisfy an angular limit."""
+
     is_valid: bool
     invalid_count: int
     maximum_valid: float | None
 
 
 def robust_masks(flag_ltg: np.ndarray) -> MorphologyMasks:
-    """Separate only flags 4 and 5 into the robust ETG/LTG samples."""
+    """Separate only flags 4 and 5 into robust ETG and LTG samples.
+
+    Flags 0–3 encode lower-confidence catalogue outcomes.  Keeping them in a
+    separate mask prevents the tempting even/odd shortcut from contaminating
+    the primary robust comparison.
+    """
     flags = np.asarray(flag_ltg)
     robust_etg = flags == 4
     robust_ltg = flags == 5
@@ -40,7 +55,12 @@ def robust_masks(flag_ltg: np.ndarray) -> MorphologyMasks:
 
 
 def valid_value_mask(values: np.ndarray, domain: str) -> np.ndarray:
-    """Return finite values inside one named scientific domain."""
+    """Return finite values inside one named scientific validity domain.
+
+    Named domains make every rule auditable in the notebook and keep NaN/Inf
+    handling consistent across coordinates, radii, probabilities, and match
+    separations.
+    """
     values = np.asarray(values, dtype=float)
     finite = np.isfinite(values)
     rules = {
@@ -57,7 +77,11 @@ def valid_value_mask(values: np.ndarray, domain: str) -> np.ndarray:
 
 
 def validate_separation(values: np.ndarray, maximum_arcsec: float) -> SeparationValidation:
-    """Validate a nonnegative angular match separation threshold."""
+    """Validate nonnegative angular separations against a maximum in arcsec.
+
+    The result reports both pass/fail state and counts so a bad match catalogue
+    cannot proceed to normal-looking figures after silently dropping rows.
+    """
     values = np.asarray(values, dtype=float)
     valid = valid_value_mask(values, "nonnegative") & (values <= maximum_arcsec)
     finite_valid = values[valid]
@@ -67,7 +91,11 @@ def validate_separation(values: np.ndarray, maximum_arcsec: float) -> Separation
 
 
 def audit_filter(stage: str, rule: str, keep_mask: np.ndarray) -> FilterAuditRow:
-    """Describe exactly how many rows a boolean filter removes."""
+    """Describe exactly how many rows a boolean keep-mask removes and why.
+
+    Persisting these counts in ``filter_audit.csv`` makes provisional cuts and
+    data-quality losses visible rather than implicit notebook state.
+    """
     keep_mask = np.asarray(keep_mask, dtype=bool)
     n_before = int(keep_mask.size)
     n_after = int(np.count_nonzero(keep_mask))

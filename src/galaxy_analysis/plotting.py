@@ -1,4 +1,10 @@
-"""Pure Matplotlib figure constructors for galaxy morphology analysis."""
+"""Pure Matplotlib figure constructors for galaxy morphology analysis.
+
+These functions never read FITS files or save output.  They only transform
+supplied arrays into figures, leaving the notebook to choose reproducible input
+samples, stable filenames, and output directories.  This separation is why the
+scientific encodings can be tested with tiny synthetic arrays.
+"""
 
 from __future__ import annotations
 
@@ -17,12 +23,16 @@ LTG_COLOR = "tab:blue"
 
 
 def _finite_pair(first: np.ndarray, second: np.ndarray) -> np.ndarray:
+    """Return rows where both plotted variables are finite numeric values."""
+
     return np.isfinite(np.asarray(first, dtype=float)) & np.isfinite(
         np.asarray(second, dtype=float)
     )
 
 
 def _finish(figure: Figure) -> Figure:
+    """Apply the common anti-clipping layout and return the same figure."""
+
     figure.tight_layout()
     return figure
 
@@ -34,7 +44,12 @@ def plot_magnitude_radius_scatter(
     catalog_alias: str,
     flux_radius_max: float | None = None,
 ) -> Figure:
-    """Plot robust classes in magnitude–angular-radius space."""
+    """Plot magnitude against angular radius for all rows or robust classes.
+
+    ``masks=None`` is the unbiased coverage view.  Passing morphology masks
+    produces the flag-4/flag-5 comparison without reclassifying flags 0–3.  An
+    optional radius limit supports the advisor's provisional ``<50`` request.
+    """
     magnitude = np.asarray(magnitude, dtype=float)
     radius = np.asarray(radius, dtype=float)
     valid = _finite_pair(magnitude, radius)
@@ -64,6 +79,8 @@ def plot_magnitude_radius_scatter(
                 s=8,
                 alpha=0.3,
                 color=color,
+                # Rasterization keeps dense points compact inside vector-like
+                # notebook output without changing labels or axes.
                 rasterized=True,
                 label=f"{label} (N={np.count_nonzero(selected):,})",
             )
@@ -72,6 +89,7 @@ def plot_magnitude_radius_scatter(
     axis.set_title(f"{catalog_alias}: {sample_name} magnitude–radius{suffix}")
     axis.set_xlabel("MAG_AUTO_R [mag] (brighter ←)")
     axis.set_ylabel("FLUX_RADIUS_R [pixel]")
+    # Astronomical magnitude runs backwards: smaller numbers are brighter.
     axis.invert_xaxis()
     axis.legend()
     axis.grid(alpha=0.2)
@@ -84,7 +102,12 @@ def plot_magnitude_radius_density(
     catalog_alias: str,
     flux_radius_max: float | None = None,
 ) -> Figure:
-    """Plot the full valid magnitude–radius density as logarithmic hexagons."""
+    """Plot the full valid magnitude–radius density as logarithmic hexagons.
+
+    Hexbin uses every valid row and reveals the dense locus without the severe
+    overplotting of a million-point scatter plot.  Log counts retain visibility
+    for both common and sparse regions.
+    """
     magnitude = np.asarray(magnitude, dtype=float)
     radius = np.asarray(radius, dtype=float)
     valid = _finite_pair(magnitude, radius)
@@ -110,7 +133,12 @@ def plot_probability_by_class(
     probability_name: str,
     catalog_alias: str,
 ) -> Figure:
-    """Compare normalized probability distributions for robust ETGs and LTGs."""
+    """Compare normalized probability distributions for robust ETGs and LTGs.
+
+    Identical bins and density normalization compare distribution shape despite
+    the strong class imbalance.  Fixed probability bounds prevent autoscaling
+    from making two model outputs appear less comparable than they are.
+    """
     probability = np.asarray(probability, dtype=float)
     valid = np.isfinite(probability) & (probability >= 0) & (probability <= 1)
     bins = np.linspace(0, 1, 41)
@@ -144,7 +172,11 @@ def plot_model_dispersion_by_class(
     masks: MorphologyMasks,
     catalog_alias: str,
 ) -> Figure:
-    """Show per-object P1–P5 LTG dispersion with median and IQR by class."""
+    """Show per-object P1–P5 LTG dispersion with median and IQR by class.
+
+    A box plot emphasizes the median and middle 50% rather than allowing a
+    small number of extreme disagreements to dominate the vertical scale.
+    """
     dispersion = np.asarray(dispersion, dtype=float)
     groups = []
     for class_mask in (masks.robust_etg, masks.robust_ltg):
@@ -155,6 +187,8 @@ def plot_model_dispersion_by_class(
     boxes = axis.boxplot(
         groups,
         tick_labels=[f"Robust ETG\nN={groups[0].size:,}", f"Robust LTG\nN={groups[1].size:,}"],
+        # Outliers remain in numerical summaries; hiding their markers keeps
+        # this diagnostic focused on the requested median and IQR.
         showfliers=False,
         patch_artist=True,
     )
@@ -173,7 +207,12 @@ def plot_probability_vs_magnitude(
     probability: np.ndarray,
     catalog_alias: str,
 ) -> Figure:
-    """Plot LTG probability density against apparent magnitude."""
+    """Plot LTG probability density against apparent magnitude.
+
+    The magnitude axis increases normally here so moving right explicitly means
+    fainter sources.  This makes it easier to inspect—not causally attribute—
+    growing probability ambiguity toward lower apparent flux.
+    """
     magnitude = np.asarray(magnitude, dtype=float)
     probability = np.asarray(probability, dtype=float)
     valid = _finite_pair(magnitude, probability) & (probability >= 0) & (probability <= 1)
@@ -202,7 +241,11 @@ def plot_edgeon_vs_ltg_probability(
     edgeon_probability: np.ndarray,
     catalog_alias: str,
 ) -> Figure:
-    """Plot joint density of LTG and edge-on probability estimates."""
+    """Plot joint density of LTG and edge-on probability estimates.
+
+    Both outputs share fixed ``[0, 1]`` axes.  A two-dimensional density view
+    exposes orientation-related branches that separate histograms would hide.
+    """
     ltg_probability = np.asarray(ltg_probability, dtype=float)
     edgeon_probability = np.asarray(edgeon_probability, dtype=float)
     valid = _finite_pair(ltg_probability, edgeon_probability)
@@ -235,7 +278,12 @@ def plot_sky_distribution(
     masks: MorphologyMasks | None,
     catalog_alias: str,
 ) -> Figure:
-    """Plot catalogue coordinates without interpolating across survey gaps."""
+    """Plot catalogue coordinates without interpolating across survey gaps.
+
+    Direct rasterized points preserve holes from footprint or masking.  The
+    function deliberately avoids smoothing because that could visually fill
+    regions where the catalogue contains no observations.
+    """
     ra_deg = np.asarray(ra_deg, dtype=float)
     dec_deg = np.asarray(dec_deg, dtype=float)
     valid = _finite_pair(ra_deg, dec_deg)
@@ -274,7 +322,11 @@ def plot_sky_distribution(
 
 
 def plot_flag_counts(flags: np.ndarray, catalog_alias: str) -> Figure:
-    """Plot counts and percentages for all FLAG_LTG values 0 through 5."""
+    """Plot counts and percentages for all ``FLAG_LTG`` values 0 through 5.
+
+    Neutral colors keep flags 0–3 visibly non-robust; only the explicitly used
+    flag-4 ETG and flag-5 LTG bars receive the analysis class colors.
+    """
     flags = np.asarray(flags)
     counts = np.array([np.count_nonzero(flags == value) for value in range(6)])
     total = int(flags.size)
@@ -303,7 +355,12 @@ def plot_robust_fraction_comparison(
     highlum_counts: list[FlagCountRow],
     highdens_counts: list[FlagCountRow],
 ) -> Figure:
-    """Compare robust class fractions with 95% Wilson interval error bars."""
+    """Compare robust class fractions with 95% Wilson interval error bars.
+
+    Fractions use each complete matched catalogue as denominator.  Wilson
+    intervals communicate counting precision while the notebook separately
+    warns that selection-systematic uncertainty can be much larger.
+    """
     figure, axis = plt.subplots(figsize=(8, 5))
     positions = np.arange(2)
     width = 0.36
@@ -346,7 +403,12 @@ def plot_parameter_comparison(
     highlum_values: Mapping[str, np.ndarray],
     highdens_values: Mapping[str, np.ndarray],
 ) -> Figure:
-    """Compare normalized parameter distributions on shared class-panel limits."""
+    """Compare normalized parameter distributions on shared class-panel limits.
+
+    Separate ETG/LTG panels control class mixture, normalization controls
+    catalogue size, and pooled limits prevent autoscaling from manufacturing a
+    visual difference between ``highlum`` and ``highdens``.
+    """
     class_names = ("robust_etg", "robust_ltg")
     finite_arrays = []
     for values_by_class in (highlum_values, highdens_values):
@@ -354,6 +416,8 @@ def plot_parameter_comparison(
             values = np.asarray(values_by_class[class_name], dtype=float)
             finite_arrays.append(values[np.isfinite(values)])
     pooled = np.concatenate([values for values in finite_arrays if values.size])
+    # Probability outputs have a physical/model domain known in advance.  Other
+    # variables use a single pooled domain shared by every line and panel.
     if variable.startswith("MP_"):
         limits = (0.0, 1.0)
     elif pooled.size:
@@ -398,12 +462,20 @@ def plot_separation_comparison(
     highdens_separation: np.ndarray,
     max_arcsec: float = 1.0,
 ) -> Figure:
-    """Compare normalized coordinate-match separation distributions."""
+    """Compare normalized coordinate-match separations on a logarithmic axis.
+
+    Most valid matches are near ``1e-3`` arcsec while the acceptance rule is
+    1 arcsec.  Logarithmic bins make the narrow core readable without hiding the
+    full threshold.  Exact zeros, which cannot appear on a log axis, are kept in
+    the first positive-width bin instead of being discarded.
+    """
     figure, axis = plt.subplots(figsize=(8, 5))
     prepared = []
     for source in (highlum_separation, highdens_separation):
         values = np.asarray(source, dtype=float)
         prepared.append(values[np.isfinite(values) & (values >= 0) & (values <= max_arcsec)])
+    # One lower bound is derived from both catalogues so neither receives a
+    # more favorable resolution or axis range.
     positive = np.concatenate([values[values > 0] for values in prepared])
     lower = float(np.min(positive)) if positive.size else max_arcsec * 1e-6
     bins = np.geomspace(lower, max_arcsec, 51)
