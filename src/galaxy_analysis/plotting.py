@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.figure import Figure
 
 from .selection import MorphologyMasks
+from .statistics import FlagCountRow
 
 
 ETG_COLOR = "tab:red"
@@ -293,4 +296,137 @@ def plot_flag_counts(flags: np.ndarray, catalog_alias: str) -> Figure:
     axis.set_xlabel("FLAG_LTG value")
     axis.set_ylabel("Galaxy count")
     axis.grid(axis="y", alpha=0.2)
+    return _finish(figure)
+
+
+def plot_robust_fraction_comparison(
+    highlum_counts: list[FlagCountRow],
+    highdens_counts: list[FlagCountRow],
+) -> Figure:
+    """Compare robust class fractions with 95% Wilson interval error bars."""
+    figure, axis = plt.subplots(figsize=(8, 5))
+    positions = np.arange(2)
+    width = 0.36
+    for offset, rows, label, color in (
+        (-width / 2, highlum_counts, "highlum", "0.35"),
+        (width / 2, highdens_counts, "highdens", "tab:green"),
+    ):
+        by_flag = {row.flag_ltg: row for row in rows}
+        selected = [by_flag[4], by_flag[5]]
+        fractions = np.array([row.fraction_of_total for row in selected])
+        lower = np.array([
+            fraction - (row.wilson_low_95 if row.wilson_low_95 is not None else fraction)
+            for fraction, row in zip(fractions, selected, strict=True)
+        ])
+        upper = np.array([
+            (row.wilson_high_95 if row.wilson_high_95 is not None else fraction) - fraction
+            for fraction, row in zip(fractions, selected, strict=True)
+        ])
+        axis.bar(
+            positions + offset,
+            fractions,
+            width,
+            yerr=np.vstack([lower, upper]),
+            capsize=4,
+            color=color,
+            alpha=0.8,
+            label=label,
+        )
+    axis.set_xticks(positions, ["Robust ETG (flag 4)", "Robust LTG (flag 5)"])
+    axis.set_ylim(0, 1)
+    axis.set_ylabel("Fraction of matched catalogue")
+    axis.set_title("Robust morphology fractions with Wilson 95% intervals")
+    axis.legend()
+    axis.grid(axis="y", alpha=0.2)
+    return _finish(figure)
+
+
+def plot_parameter_comparison(
+    variable: str,
+    highlum_values: Mapping[str, np.ndarray],
+    highdens_values: Mapping[str, np.ndarray],
+) -> Figure:
+    """Compare normalized parameter distributions on shared class-panel limits."""
+    class_names = ("robust_etg", "robust_ltg")
+    finite_arrays = []
+    for values_by_class in (highlum_values, highdens_values):
+        for class_name in class_names:
+            values = np.asarray(values_by_class[class_name], dtype=float)
+            finite_arrays.append(values[np.isfinite(values)])
+    pooled = np.concatenate([values for values in finite_arrays if values.size])
+    if variable.startswith("MP_"):
+        limits = (0.0, 1.0)
+    elif pooled.size:
+        limits = (float(np.min(pooled)), float(np.max(pooled)))
+        if limits[0] == limits[1]:
+            limits = (limits[0] - 0.5, limits[1] + 0.5)
+    else:
+        limits = (0.0, 1.0)
+    bins = np.linspace(*limits, 41)
+
+    figure, axes = plt.subplots(1, 2, figsize=(12, 4.5), sharex=True, sharey=True)
+    for axis, class_name, class_label in zip(
+        axes, class_names, ("Robust ETG (flag 4)", "Robust LTG (flag 5)"), strict=True
+    ):
+        for values_by_class, catalog_alias, color in (
+            (highlum_values, "highlum", "0.25"),
+            (highdens_values, "highdens", "tab:green"),
+        ):
+            values = np.asarray(values_by_class[class_name], dtype=float)
+            values = values[np.isfinite(values)]
+            axis.hist(
+                values,
+                bins=bins,
+                density=bool(values.size),
+                histtype="step",
+                linewidth=2,
+                color=color,
+                label=catalog_alias,
+            )
+        axis.set_xlim(limits)
+        axis.set_xlabel(variable)
+        axis.set_ylabel("Normalized density")
+        axis.set_title(class_label)
+        axis.legend()
+        axis.grid(alpha=0.2)
+    figure.suptitle(f"Matched-catalogue comparison: {variable}")
+    return _finish(figure)
+
+
+def plot_separation_comparison(
+    highlum_separation: np.ndarray,
+    highdens_separation: np.ndarray,
+    max_arcsec: float = 1.0,
+) -> Figure:
+    """Compare normalized coordinate-match separation distributions."""
+    figure, axis = plt.subplots(figsize=(8, 5))
+    prepared = []
+    for source in (highlum_separation, highdens_separation):
+        values = np.asarray(source, dtype=float)
+        prepared.append(values[np.isfinite(values) & (values >= 0) & (values <= max_arcsec)])
+    positive = np.concatenate([values[values > 0] for values in prepared])
+    lower = float(np.min(positive)) if positive.size else max_arcsec * 1e-6
+    bins = np.geomspace(lower, max_arcsec, 51)
+    for values, label, color in (
+        (prepared[0], "highlum", "0.25"),
+        (prepared[1], "highdens", "tab:green"),
+    ):
+        plotted = np.where(values == 0, lower, values)
+        axis.hist(
+            plotted,
+            bins=bins,
+            density=bool(plotted.size),
+            histtype="step",
+            linewidth=2,
+            color=color,
+            label=label,
+        )
+    axis.axvline(max_arcsec, color="tab:red", linestyle="--", label=f"{max_arcsec:g} arcsec limit")
+    axis.set_xscale("log")
+    axis.set_xlim(lower, max_arcsec * 1.05)
+    axis.set_xlabel("Coordinate-match separation [arcsec, log scale]")
+    axis.set_ylabel("Normalized density")
+    axis.set_title("Coordinate-match separation comparison")
+    axis.legend()
+    axis.grid(alpha=0.2)
     return _finish(figure)

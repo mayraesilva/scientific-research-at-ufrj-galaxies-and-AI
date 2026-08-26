@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 from astropy.io import fits
 
+import src.galaxy_analysis.catalog as catalog_module
+
 from src.galaxy_analysis.catalog import (
     find_table_hdu,
     inspect_catalog,
@@ -44,6 +46,36 @@ def test_read_columns_preserves_sorted_index_order(synthetic_crossmatch_path):
 def test_read_columns_rejects_missing_column(synthetic_crossmatch_path):
     with pytest.raises(KeyError, match="missing required FITS columns: UNKNOWN"):
         read_columns(synthetic_crossmatch_path, ("UNKNOWN",))
+
+
+def test_read_columns_never_accesses_unrequested_columns(monkeypatch, tmp_path):
+    accessed = []
+
+    class FakeData:
+        names = ("FLAG_LTG", "MP_LTG", "UNREQUESTED")
+
+        def __getitem__(self, name):
+            accessed.append(name)
+            if name == "UNREQUESTED":
+                raise AssertionError("unrequested column was accessed")
+            return np.array([4, 5])
+
+    class FakeHDUList:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def __getitem__(self, index):
+            assert index == 0
+            return type("FakeHDU", (), {"data": FakeData()})()
+
+    monkeypatch.setattr(catalog_module.fits, "open", lambda *args, **kwargs: FakeHDUList())
+    monkeypatch.setattr(catalog_module, "find_table_hdu", lambda hdul: 0)
+    result = read_columns(tmp_path / "synthetic.fits", ("FLAG_LTG", "MP_LTG"))
+    assert tuple(result) == ("FLAG_LTG", "MP_LTG")
+    assert accessed == ["FLAG_LTG", "MP_LTG"]
 
 
 def test_random_indices_are_unique_sorted_and_reproducible():

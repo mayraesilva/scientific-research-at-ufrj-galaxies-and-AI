@@ -15,9 +15,13 @@ from src.galaxy_analysis.plotting import (
     plot_model_dispersion_by_class,
     plot_probability_by_class,
     plot_probability_vs_magnitude,
+    plot_parameter_comparison,
+    plot_robust_fraction_comparison,
+    plot_separation_comparison,
     plot_sky_distribution,
 )
 from src.galaxy_analysis.selection import robust_masks
+from src.galaxy_analysis.statistics import flag_count_rows
 
 
 @pytest.fixture
@@ -140,3 +144,44 @@ def test_flag_counts_show_every_flag_and_percent(sample):
     assert all("%" in text.get_text() for text in axis.texts)
     np.testing.assert_array_equal(flags, sample["flags"])
     assert_figure_labels(figure, "FLAG_LTG value", "Galaxy count")
+
+
+def test_robust_fraction_comparison_has_both_catalogues_and_probability_scale():
+    highlum = flag_count_rows("highlum", np.array([4, 4, 4, 5, 0]))
+    highdens = flag_count_rows("highdens", np.array([4, 5, 5, 5, 1]))
+    figure = plot_robust_fraction_comparison(highlum, highdens)
+    axis = figure.axes[0]
+    assert axis.get_ylim() == pytest.approx((0.0, 1.0))
+    assert axis.get_legend_handles_labels()[1] == ["highlum", "highdens"]
+    assert [tick.get_text() for tick in axis.get_xticklabels()] == [
+        "Robust ETG (flag 4)",
+        "Robust LTG (flag 5)",
+    ]
+    plt.close(figure)
+
+
+def test_parameter_comparison_uses_shared_limits_and_normalized_density():
+    figure = plot_parameter_comparison(
+        "MP_LTG",
+        {"robust_etg": np.array([0.0, 0.1]), "robust_ltg": np.array([0.8, 1.0])},
+        {"robust_etg": np.array([0.05, 0.2]), "robust_ltg": np.array([0.7, 0.95])},
+    )
+    data_axes = figure.axes[:2]
+    assert all(axis.get_xlim() == pytest.approx((0.0, 1.0)) for axis in data_axes)
+    assert all(axis.get_ylabel() == "Normalized density" for axis in data_axes)
+    assert all(axis.get_legend_handles_labels()[1] == ["highlum", "highdens"] for axis in data_axes)
+    plt.close(figure)
+
+
+def test_separation_comparison_marks_one_arcsecond_and_normalizes():
+    figure = plot_separation_comparison(
+        np.array([0.1, 0.2, 0.5]), np.array([0.2, 0.4, 0.8]), max_arcsec=1.0
+    )
+    axis = figure.axes[0]
+    reference_lines = [line for line in axis.lines if np.allclose(line.get_xdata(), [1.0, 1.0])]
+    assert len(reference_lines) == 1
+    assert axis.get_xscale() == "log"
+    assert axis.get_xlabel() == "Coordinate-match separation [arcsec, log scale]"
+    assert axis.get_ylabel() == "Normalized density"
+    assert axis.get_legend_handles_labels()[1] == ["highlum", "highdens", "1 arcsec limit"]
+    plt.close(figure)

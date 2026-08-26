@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from src.galaxy_analysis.statistics import (
+    compare_catalog_summaries,
     describe_values,
     flag_count_rows,
     model_dispersion,
@@ -78,3 +79,23 @@ def test_threshold_rows_report_hand_derived_confusion_counts():
     assert row.false_positive == 1
     assert row.false_negative == 1
     assert row.agreement_with_flag5 == pytest.approx(0.5)
+
+
+def test_compare_catalog_summaries_uses_highdens_minus_highlum():
+    highlum = [
+        describe_values("highlum", "all_valid", "MP_LTG", np.arange(10.0)),
+        describe_values("highlum", "robust_etg", "MP_LTG", np.array([0.1, 0.2, 0.3])),
+    ]
+    highdens = [
+        describe_values("highdens", "all_valid", "MP_LTG", np.arange(20.0)),
+        describe_values("highdens", "robust_etg", "MP_LTG", np.array([0.3, 0.4, 0.5, 0.6])),
+    ]
+    row = compare_catalog_summaries(highlum, highdens)[0]
+    assert row.variable == "MP_LTG"
+    assert row.class_name == "robust_etg"
+    assert row.highlum_median == pytest.approx(0.2)
+    assert row.highdens_median == pytest.approx(0.45)
+    assert row.median_difference == pytest.approx(0.25)
+    assert row.highlum_fraction == pytest.approx(3 / 10)
+    assert row.highdens_fraction == pytest.approx(4 / 20)
+    assert row.fraction_difference == pytest.approx(4 / 20 - 3 / 10)

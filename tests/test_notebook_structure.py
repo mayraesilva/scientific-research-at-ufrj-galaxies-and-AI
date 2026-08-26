@@ -42,3 +42,12 @@ def test_configuration_cell_resolves_project_and_reproducibility_constants(monke
     assert namespace["MAX_SEPARATION_ARCSEC"] == 1.0
     assert namespace["FLUX_RADIUS_CUT"] == 50.0
     assert namespace["PLOT_SAMPLE_SIZE"] == 100_000
+    assert namespace["SUMMARY_HEADERS"] == (
+        "catalog", "class", "variable", "n_total", "n_valid", "n_missing",
+        "mean", "median", "std_ddof1", "min", "p05", "p25", "p50", "p75",
+        "p95", "max", "iqr",
+    )
+    assert namespace["FILTER_AUDIT_HEADERS"] == (
+        "catalog", "stage", "rule", "n_before", "n_removed", "n_after",
+        "fraction_removed",
+    )

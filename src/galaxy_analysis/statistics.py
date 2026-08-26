@@ -55,6 +55,18 @@ class ThresholdRow:
     agreement_with_flag5: float
 
 
+@dataclass(frozen=True)
+class ComparisonRow:
+    variable: str
+    class_name: str
+    highlum_median: float | None
+    highdens_median: float | None
+    median_difference: float | None
+    highlum_fraction: float
+    highdens_fraction: float
+    fraction_difference: float
+
+
 def wilson_interval(count: int, total: int) -> tuple[float | None, float | None]:
     """Return the two-sided 95% Wilson interval for a binomial proportion."""
     if total == 0:
@@ -191,3 +203,47 @@ def threshold_rows(
             )
         )
     return rows
+
+
+def compare_catalog_summaries(
+    highlum_rows: list[SummaryRow],
+    highdens_rows: list[SummaryRow],
+) -> list[ComparisonRow]:
+    """Compare matched class summaries with differences defined highdens − highlum."""
+    highdens_by_key = {(row.variable, row.class_name): row for row in highdens_rows}
+    highlum_totals = {
+        row.variable: row.n_total for row in highlum_rows if row.class_name == "all_valid"
+    }
+    highdens_totals = {
+        row.variable: row.n_total for row in highdens_rows if row.class_name == "all_valid"
+    }
+    comparisons = []
+    for highlum in highlum_rows:
+        if highlum.class_name == "all_valid":
+            continue
+        key = (highlum.variable, highlum.class_name)
+        if key not in highdens_by_key:
+            raise ValueError(f"highdens summary is missing {key}")
+        if highlum.variable not in highlum_totals or highlum.variable not in highdens_totals:
+            raise ValueError(f"all_valid denominator is missing for {highlum.variable}")
+        highdens = highdens_by_key[key]
+        highlum_fraction = highlum.n_total / highlum_totals[highlum.variable]
+        highdens_fraction = highdens.n_total / highdens_totals[highlum.variable]
+        median_difference = (
+            highdens.median - highlum.median
+            if highdens.median is not None and highlum.median is not None
+            else None
+        )
+        comparisons.append(
+            ComparisonRow(
+                variable=highlum.variable,
+                class_name=highlum.class_name,
+                highlum_median=highlum.median,
+                highdens_median=highdens.median,
+                median_difference=median_difference,
+                highlum_fraction=highlum_fraction,
+                highdens_fraction=highdens_fraction,
+                fraction_difference=highdens_fraction - highlum_fraction,
+            )
+        )
+    return comparisons
