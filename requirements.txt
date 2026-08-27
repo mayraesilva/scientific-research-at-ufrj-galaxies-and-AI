@@ -1,8 +1,20 @@
+# ==============================================================================
+# Scientific Research at UFRJ: Galaxies and AI
+# Central Project Dependencies
+# ==============================================================================
+
+# Core Astronomy & Scientific Computing
 astropy>=8.0
-jupyterlab>=4.4
+numpy>=2.5
 matplotlib>=3.11
+
+# Jupyter & Interactive Notebook Environment
+jupyterlab>=4.4
+ipykernel>=7.0
+ipython>=9.0
 nbclient>=0.10
 nbconvert>=7.16
 nbformat>=5.10
-numpy>=2.5
+
+# Testing & Quality Assurance
 pytest>=8.4
