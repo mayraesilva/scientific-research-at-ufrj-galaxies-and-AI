@@ -2,8 +2,10 @@
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 
 import nbformat
+import numpy as np
 
 
 NOTEBOOK = Path("notebooks/01_robust_morphology_environment_analysis.ipynb")
@@ -195,3 +197,82 @@ def test_completed_front_half_contains_no_incomplete_execution_guards():
             and node.exc.func.id == "NotImplementedError"
         ]
         assert incomplete_raises == []
+
+
+def test_complete_notebook_has_every_analysis_and_artifact_cell():
+    """Catch a scientific section that remains prose without execution."""
+
+    cell_ids = {cell.id for cell in load_notebook().cells}
+    required = {
+        "figure-04-magnitude-radius",
+        "figure-04-interpretation",
+        "figure-05-morphology-brightness-size",
+        "figure-05-interpretation",
+        "figure-06-faintness",
+        "figure-06-interpretation",
+        "figure-07-orientation",
+        "figure-07-interpretation",
+        "figure-08-sky",
+        "figure-08-interpretation",
+        "figure-09-separation",
+        "figure-09-interpretation",
+        "parent-sample",
+        "comparison-artifacts",
+        "run-metadata",
+    }
+    assert required <= cell_ids
+
+
+def test_complete_notebook_contains_no_incomplete_execution_guards():
+    """Catch any committed cell that deliberately stops full execution."""
+
+    for cell in code_cells(load_notebook()):
+        tree = ast.parse(cell.source)
+        incomplete_raises = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Raise)
+            and isinstance(node.exc, ast.Call)
+            and isinstance(node.exc.func, ast.Name)
+            and node.exc.func.id == "NotImplementedError"
+        ]
+        assert incomplete_raises == []
+
+
+def test_parent_sample_cell_saves_unique_sorted_indices_only(tmp_path):
+    """Catch copied catalogue data or non-deterministic parent extraction."""
+
+    notebook = load_notebook()
+    source = next(cell.source for cell in notebook.cells if cell.id == "parent-sample")
+    namespace = {
+        "np": np,
+        "OUTPUT_ROOT": tmp_path,
+        "PLOT_SAMPLE_SIZE": 100_000,
+        "SEED": 20260713,
+        "random_indices": lambda population, sample, seed: np.arange(
+            min(population, sample), dtype=np.int64
+        ),
+        "schemas": {"parent_morphology": SimpleNamespace(row_count=7)},
+    }
+
+    exec(source, namespace)
+
+    output_directory = tmp_path / "parent-sample"
+    np.testing.assert_array_equal(
+        np.load(output_directory / "sample_indices.npy"),
+        np.arange(7),
+    )
+    assert [path.name for path in output_directory.iterdir()] == [
+        "sample_indices.npy"
+    ]
+
+
+def test_notebook_code_cells_keep_readable_line_lengths():
+    """Catch dense code that becomes hard to review inside Jupyter."""
+
+    long_lines = []
+    for cell in code_cells(load_notebook()):
+        for line_number, line in enumerate(cell.source.splitlines(), start=1):
+            if len(line) > 88:
+                long_lines.append((cell.id, line_number, len(line)))
+    assert long_lines == []
