@@ -1,3 +1,4 @@
+import ast
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -16,6 +17,13 @@ def test_notebook_is_valid_version_four_document():
     notebook = load_notebook()
     nbformat.validate(notebook)
     assert notebook.nbformat == 4
+
+
+def test_every_code_cell_contains_valid_python_syntax():
+    notebook = load_notebook()
+    for cell in notebook.cells:
+        if cell.cell_type == "code":
+            ast.parse(cell.source, filename=f"notebook-cell-{cell.id}")
 
 
 def test_notebook_is_committed_without_outputs():
