@@ -115,6 +115,7 @@ def test_magnitude_radius_comparison_uses_shared_inverted_axes():
     assert left.get_ylim() == pytest.approx(right.get_ylim())
     assert left.xaxis_inverted() and right.xaxis_inverted()
     assert left.get_ylabel() == "FLUX_RADIUS_R [pixel]"
+    assert left.collections[0].norm is right.collections[0].norm
     plt.close(figure)
 
 
@@ -164,6 +165,7 @@ def test_orientation_comparison_uses_probability_domain_and_colorbar():
     assert left.get_xlim() == pytest.approx((0.0, 1.0))
     assert right.get_xlim() == pytest.approx((0.0, 1.0))
     assert left.get_ylim() == pytest.approx((0.0, 1.0))
+    assert left.collections[0].norm is right.collections[0].norm
     assert figure.axes[-1].get_ylabel() == "Logarithmic count per hexagonal bin"
     plt.close(figure)
 

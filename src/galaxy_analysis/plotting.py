@@ -11,6 +11,7 @@ from collections.abc import Mapping
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import LogNorm
 from matplotlib.figure import Figure
 
 from .selection import MorphologyMasks
@@ -66,6 +67,25 @@ def _pooled_limits(*arrays: np.ndarray) -> tuple[float, float]:
         padding = max(abs(lower) * 0.05, 0.5)
         return lower - padding, upper + padding
     return lower, upper
+
+
+def _share_hexbin_log_norm(artists: list) -> LogNorm:
+    """Apply one count normalization to comparable logarithmic hexbins.
+
+    Matplotlib otherwise autoscales every hexbin independently.  A shared
+    normalization ensures that one color represents the same row count in
+    every panel and makes a single comparison colorbar scientifically valid.
+    """
+
+    maximum_count = max(
+        float(np.max(artist.get_array()))
+        for artist in artists
+        if artist.get_array().size
+    )
+    shared_norm = LogNorm(vmin=1, vmax=max(2.0, maximum_count))
+    for artist in artists:
+        artist.set_norm(shared_norm)
+    return shared_norm
 
 
 def plot_catalogue_composition(
@@ -253,7 +273,7 @@ def plot_magnitude_radius_comparison(
         layout="constrained",
     )
 
-    density = None
+    densities = []
     for axis, data, catalog in zip(
         axes,
         (highlum, highdens),
@@ -272,13 +292,15 @@ def plot_magnitude_radius_comparison(
             extent=extent,
             cmap="viridis",
         )
+        densities.append(density)
         axis.set_title(catalog)
         axis.set_xlabel("MAG_AUTO_R [mag] (brighter ←)")
         axis.set_ylabel("FLUX_RADIUS_R [pixel]")
 
     axes[0].invert_xaxis()
+    _share_hexbin_log_norm(densities)
     figure.colorbar(
-        density,
+        densities[-1],
         ax=axes,
         label="Logarithmic count per hexagonal bin",
     )
@@ -425,7 +447,7 @@ def plot_orientation_comparison(
         sharey=True,
         layout="constrained",
     )
-    density = None
+    densities = []
     for axis, data, catalog in zip(
         axes,
         (highlum, highdens),
@@ -447,14 +469,16 @@ def plot_orientation_comparison(
             extent=(0, 1, 0, 1),
             cmap="cividis",
         )
+        densities.append(density)
         axis.set_xlim(0, 1)
         axis.set_ylim(0, 1)
         axis.set_title(catalog)
         axis.set_xlabel("MP_LTG")
         axis.set_ylabel("MP_EdgeOn")
 
+    _share_hexbin_log_norm(densities)
     figure.colorbar(
-        density,
+        densities[-1],
         ax=axes,
         label="Logarithmic count per hexagonal bin",
     )
