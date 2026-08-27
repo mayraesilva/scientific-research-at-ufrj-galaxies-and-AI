@@ -72,20 +72,20 @@ def test_dispersion_interpretation_names_largest_measured_median():
     assert "not the full uncertainty" in text
 
 
-def test_magnitude_radius_interpretation_uses_observed_pixel_units():
-    """Catch apparent measurements incorrectly described as physical quantities."""
+def test_magnitude_radius_interpretation_describes_the_paired_locus():
+    """Catch a two-dimensional graph explained only with marginal ranges."""
 
-    rows = [
-        describe_values("highlum", "all_valid", "MAG_AUTO_R", np.array([18.0, 20.0])),
-        describe_values("highlum", "all_valid", "FLUX_RADIUS_R", np.array([3.0, 5.0])),
-        describe_values("highdens", "all_valid", "MAG_AUTO_R", np.array([17.0, 21.0])),
-        describe_values("highdens", "all_valid", "FLUX_RADIUS_R", np.array([4.0, 8.0])),
-    ]
+    text = magnitude_radius_interpretation(
+        highlum_magnitude=np.arange(18.0, 22.0, 0.5),
+        highlum_radius=np.arange(3.0, 7.0, 0.5),
+        highdens_magnitude=np.arange(17.0, 21.0, 0.5),
+        highdens_radius=np.arange(4.0, 8.0, 0.5),
+    )
 
-    text = magnitude_radius_interpretation(rows)
-
-    assert "apparent magnitudes 18.00 to 20.00" in text
-    assert "median half-light radius 4.00 pixels" in text
+    assert "central 90% locus" in text
+    assert "brightest magnitude quartile" in text
+    assert "faintest quartile" in text
+    assert "pixels" in text
     assert "not physical size" in text
 
 
@@ -93,8 +93,12 @@ def test_brightness_size_class_interpretation_compares_robust_medians():
     """Catch class comparison prose that ignores the measured class summaries."""
 
     rows = [
+        describe_values("highlum", "robust_etg", "MAG_AUTO_R", np.array([19.0])),
+        describe_values("highlum", "robust_ltg", "MAG_AUTO_R", np.array([20.0])),
         describe_values("highlum", "robust_etg", "FLUX_RADIUS_R", np.array([3.0, 5.0])),
         describe_values("highlum", "robust_ltg", "FLUX_RADIUS_R", np.array([5.0, 7.0])),
+        describe_values("highdens", "robust_etg", "MAG_AUTO_R", np.array([18.0])),
+        describe_values("highdens", "robust_ltg", "MAG_AUTO_R", np.array([19.0])),
         describe_values(
             "highdens", "robust_etg", "FLUX_RADIUS_R", np.array([4.0, 6.0])
         ),
@@ -107,6 +111,7 @@ def test_brightness_size_class_interpretation_compares_robust_medians():
 
     assert "highlum" in text and "highdens" in text
     assert "2.00 pixels" in text
+    assert "magnitude" in text
     assert "shared imaging measurements" in text
 
 
@@ -141,10 +146,21 @@ def test_orientation_interpretation_keeps_orientation_distinct():
         describe_values("highdens", "robust_ltg", "MP_EdgeOn", np.array([0.5])),
     ]
 
-    text = orientation_interpretation(rows)
+    highlum = {
+        "MP_LTG": np.array([0.1, 0.2, 0.8, 0.9]),
+        "MP_EdgeOn": np.array([0.01, 0.02, 0.3, 0.4]),
+    }
+    highdens = {
+        "MP_LTG": np.array([0.1, 0.2, 0.8, 0.9]),
+        "MP_EdgeOn": np.array([0.02, 0.03, 0.5, 0.6]),
+    }
+    text = orientation_interpretation(rows, highlum, highdens)
 
     assert "ETG median=0.100" in text
     assert "LTG median=0.500" in text
+    assert "MP_LTG <= 0.2" in text
+    assert "MP_LTG >= 0.8" in text
+    assert "MP_EdgeOn <= 0.05" in text
     assert "orientation output, not a third morphology class" in text
 
 
@@ -158,9 +174,23 @@ def test_sky_interpretation_reports_ranges_and_mask_caution():
         highdens_dec=np.array([-3.0, 2.0]),
     )
 
-    assert "RA 10.00-12.00 deg" in text
+    assert "occupies RA 10.00-12.00 deg" in text
     assert "bright-star masks" in text
     assert "must not be interpreted as physical galaxy underdensities" in text
+
+
+def test_sky_interpretation_handles_the_ra_zero_wrap():
+    """Catch a wrapped footprint described as continuous all-sky coverage."""
+
+    text = sky_interpretation(
+        highlum_ra=np.array([350.0, 5.0, 15.0]),
+        highlum_dec=np.array([-2.0, 1.0, 0.0]),
+        highdens_ra=np.array([340.0, 355.0, 10.0]),
+        highdens_dec=np.array([-3.0, 2.0, 1.0]),
+    )
+
+    assert "through RA=0 deg" in text
+    assert "covers RA 0.00-" not in text
 
 
 def test_separation_interpretation_reports_percentiles_and_angular_limit():

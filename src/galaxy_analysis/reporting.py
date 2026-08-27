@@ -6,6 +6,8 @@ those measurements.  This keeps notebook prose natural while ensuring that a
 catalogue update cannot leave hard-coded numbers behind.
 """
 
+from collections.abc import Mapping
+
 import numpy as np
 
 from .statistics import (
@@ -137,17 +139,55 @@ def dispersion_interpretation(rows: list[SummaryRow]) -> str:
     )
 
 
-def magnitude_radius_interpretation(rows: list[SummaryRow]) -> str:
-    """Describe observed magnitude and pixel-radius ranges for both files."""
+def _brightness_radius_locus(
+    magnitude: np.ndarray,
+    radius: np.ndarray,
+) -> tuple[float, float, float, float, float, float]:
+    """Summarize the central paired locus and its bright-to-faint direction."""
+
+    magnitude = np.asarray(magnitude, dtype=float)
+    radius = np.asarray(radius, dtype=float)
+    valid = np.isfinite(magnitude) & np.isfinite(radius) & (radius > 0)
+    magnitude = magnitude[valid]
+    radius = radius[valid]
+    if not magnitude.size:
+        raise ValueError("magnitude and radius need at least one valid pair")
+
+    magnitude_low, magnitude_high = np.percentile(magnitude, [5, 95])
+    radius_low, radius_high = np.percentile(radius, [5, 95])
+    bright_boundary, faint_boundary = np.percentile(magnitude, [25, 75])
+    bright_radius = float(np.median(radius[magnitude <= bright_boundary]))
+    faint_radius = float(np.median(radius[magnitude >= faint_boundary]))
+    return (
+        float(magnitude_low),
+        float(magnitude_high),
+        float(radius_low),
+        float(radius_high),
+        bright_radius,
+        faint_radius,
+    )
+
+
+def magnitude_radius_interpretation(
+    highlum_magnitude: np.ndarray,
+    highlum_radius: np.ndarray,
+    highdens_magnitude: np.ndarray,
+    highdens_radius: np.ndarray,
+) -> str:
+    """Describe each paired brightness-radius locus in image-plane units."""
 
     statements = []
-    for catalog in ("highlum", "highdens"):
-        magnitude = _summary_lookup(rows, catalog, "all_valid", "MAG_AUTO_R")
-        radius = _summary_lookup(rows, catalog, "all_valid", "FLUX_RADIUS_R")
+    for catalog, magnitude, radius in (
+        ("highlum", highlum_magnitude, highlum_radius),
+        ("highdens", highdens_magnitude, highdens_radius),
+    ):
+        locus = _brightness_radius_locus(magnitude, radius)
         statements.append(
-            f"{catalog} spans apparent magnitudes {magnitude.minimum:.2f} to "
-            f"{magnitude.maximum:.2f} and has median half-light radius "
-            f"{radius.median:.2f} pixels"
+            f"The {catalog} central 90% locus spans MAG_AUTO_R "
+            f"{locus[0]:.2f}-{locus[1]:.2f} mag and half-light radius "
+            f"{locus[2]:.2f}-{locus[3]:.2f} pixels; median radius is "
+            f"{locus[4]:.2f} pixels in the brightest magnitude quartile and "
+            f"{locus[5]:.2f} pixels in the faintest quartile"
         )
 
     return "; ".join(statements) + (
@@ -157,16 +197,28 @@ def magnitude_radius_interpretation(rows: list[SummaryRow]) -> str:
 
 
 def brightness_size_class_interpretation(rows: list[SummaryRow]) -> str:
-    """Quantify robust-class median radius contrasts in each catalogue."""
+    """Quantify both coordinates of each robust-class median locus."""
 
     statements = []
     for catalog in ("highlum", "highdens"):
-        etg = _summary_lookup(rows, catalog, "robust_etg", "FLUX_RADIUS_R")
-        ltg = _summary_lookup(rows, catalog, "robust_ltg", "FLUX_RADIUS_R")
-        difference = ltg.median - etg.median
+        etg_magnitude = _summary_lookup(
+            rows, catalog, "robust_etg", "MAG_AUTO_R"
+        )
+        ltg_magnitude = _summary_lookup(
+            rows, catalog, "robust_ltg", "MAG_AUTO_R"
+        )
+        etg_radius = _summary_lookup(
+            rows, catalog, "robust_etg", "FLUX_RADIUS_R"
+        )
+        ltg_radius = _summary_lookup(
+            rows, catalog, "robust_ltg", "FLUX_RADIUS_R"
+        )
+        magnitude_difference = ltg_magnitude.median - etg_magnitude.median
+        radius_difference = ltg_radius.median - etg_radius.median
         statements.append(
-            f"In {catalog}, the robust-LTG median half-light radius is "
-            f"{difference:+.2f} pixels relative to the robust-ETG median"
+            f"In {catalog}, the robust-LTG median locus is "
+            f"{magnitude_difference:+.2f} magnitude (positive is fainter) "
+            f"and {radius_difference:+.2f} pixels relative to robust ETG"
         )
 
     return "; ".join(statements) + (
@@ -202,21 +254,71 @@ def faintness_interpretation(
     )
 
 
-def orientation_interpretation(rows: list[SummaryRow]) -> str:
-    """Compare edge-on medians while preserving their orientation meaning."""
+def _orientation_structure(data: Mapping[str, np.ndarray]) -> tuple[float, float, float]:
+    """Measure edge-on floor concentration and low/high-LTG medians."""
+
+    ltg = np.asarray(data["MP_LTG"], dtype=float)
+    edgeon = np.asarray(data["MP_EdgeOn"], dtype=float)
+    valid = np.isfinite(ltg) & np.isfinite(edgeon)
+    valid &= (ltg >= 0) & (ltg <= 1) & (edgeon >= 0) & (edgeon <= 1)
+    ltg = ltg[valid]
+    edgeon = edgeon[valid]
+    low = edgeon[ltg <= 0.2]
+    high = edgeon[ltg >= 0.8]
+    if not edgeon.size or not low.size or not high.size:
+        raise ValueError("orientation summary needs low- and high-LTG pairs")
+    return (
+        float(np.mean(edgeon <= 0.05)),
+        float(np.median(low)),
+        float(np.median(high)),
+    )
+
+
+def orientation_interpretation(
+    rows: list[SummaryRow],
+    highlum: Mapping[str, np.ndarray],
+    highdens: Mapping[str, np.ndarray],
+) -> str:
+    """Describe the joint LTG-edge-on density and robust-class medians."""
 
     statements = []
-    for catalog in ("highlum", "highdens"):
+    for catalog, data in (("highlum", highlum), ("highdens", highdens)):
         etg = _summary_lookup(rows, catalog, "robust_etg", "MP_EdgeOn")
         ltg = _summary_lookup(rows, catalog, "robust_ltg", "MP_EdgeOn")
+        floor_fraction, low_median, high_median = _orientation_structure(data)
         statements.append(
-            f"{catalog}: ETG median={etg.median:.3f}, "
+            f"{catalog} places {floor_fraction:.1%} of valid rows at "
+            f"MP_EdgeOn <= 0.05; median MP_EdgeOn is {low_median:.3f} for "
+            f"MP_LTG <= 0.2 and {high_median:.3f} for MP_LTG >= 0.8. "
+            f"Within robust flags, ETG median={etg.median:.3f} and "
             f"LTG median={ltg.median:.3f}"
         )
 
     return "; ".join(statements) + (
         ". MP_EdgeOn is an orientation output, not a third morphology class; "
         "projection can hide disk and spiral structure."
+    )
+
+
+def _ra_arc_description(catalog: str, values: np.ndarray) -> str:
+    """Describe the shortest circular RA arc without implying all-sky coverage."""
+
+    finite = np.asarray(values, dtype=float)
+    finite = np.sort(np.mod(finite[np.isfinite(finite)], 360.0))
+    if not finite.size:
+        raise ValueError("RA needs at least one finite coordinate")
+    if finite.size == 1:
+        return f"{catalog} occupies RA {finite[0]:.2f} deg"
+
+    circular_gaps = np.diff(np.concatenate([finite, [finite[0] + 360.0]]))
+    gap_index = int(np.argmax(circular_gaps))
+    start = float(finite[(gap_index + 1) % finite.size])
+    end = float(finite[gap_index])
+    if start <= end:
+        return f"{catalog} occupies RA {start:.2f}-{end:.2f} deg"
+    return (
+        f"{catalog} occupies RA {start:.2f} deg through RA=0 deg "
+        f"to {end:.2f} deg"
     )
 
 
@@ -228,16 +330,13 @@ def sky_interpretation(
 ) -> str:
     """Report coordinate extents and explain why visible holes are ambiguous."""
 
-    highlum_ra_range = _finite_range(highlum_ra)
     highlum_dec_range = _finite_range(highlum_dec)
-    highdens_ra_range = _finite_range(highdens_ra)
     highdens_dec_range = _finite_range(highdens_dec)
 
     return (
-        f"highlum covers RA {highlum_ra_range[0]:.2f}-"
-        f"{highlum_ra_range[1]:.2f} deg and DEC "
+        f"{_ra_arc_description('highlum', highlum_ra)} and DEC "
         f"{highlum_dec_range[0]:.2f}-{highlum_dec_range[1]:.2f} deg; highdens "
-        f"covers RA {highdens_ra_range[0]:.2f}-{highdens_ra_range[1]:.2f} deg "
+        f"{_ra_arc_description('highdens', highdens_ra).removeprefix('highdens ')} "
         f"and DEC {highdens_dec_range[0]:.2f}-"
         f"{highdens_dec_range[1]:.2f} deg. Holes can mark footprint boundaries "
         "or bright-star masks and must not be interpreted as physical galaxy "
