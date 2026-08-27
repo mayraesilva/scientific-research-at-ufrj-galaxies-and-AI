@@ -114,17 +114,20 @@ def test_faintness_interpretation_describes_measured_endpoint_change():
     """Catch trend prose that omits endpoint values or claims an accuracy change."""
 
     summary = BinnedSummary(
-        bin_edges=np.array([18.0, 19.0, 20.0]),
-        bin_centers=np.array([18.5, 19.5]),
-        count=np.array([20, 30]),
-        median=np.array([0.2, 0.5]),
-        p25=np.array([0.1, 0.3]),
-        p75=np.array([0.4, 0.7]),
+        bin_edges=np.array([17.0, 18.0, 19.0, 20.0]),
+        bin_centers=np.array([17.5, 18.5, 19.5]),
+        count=np.array([1, 20, 30]),
+        median=np.array([0.9, 0.2, 0.5]),
+        p25=np.array([0.9, 0.1, 0.3]),
+        p75=np.array([0.9, 0.4, 0.7]),
     )
 
-    text = faintness_interpretation("highlum", summary)
+    text = faintness_interpretation("highlum", summary, minimum_count=10)
 
     assert "0.200" in text and "0.500" in text
+    assert "0.900" not in text
+    assert "at least 10 rows" in text
+    assert "n=20" in text and "n=30" in text
     assert "independent truth labels" in text
 
 

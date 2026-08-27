@@ -172,6 +172,7 @@ def test_configuration_resolves_project_and_reproducibility_constants(monkeypatc
     assert namespace["MAX_SEPARATION_ARCSEC"] == 1.0
     assert namespace["FLUX_RADIUS_CUT"] == 50.0
     assert namespace["PLOT_SAMPLE_SIZE"] == 100_000
+    assert namespace["MIN_FAINTNESS_BIN_COUNT"] == 100
     assert namespace["FIGURE_ROOT"] == (
         Path.cwd().resolve() / "outputs" / "meeting-2026-07-13" / "figures"
     )

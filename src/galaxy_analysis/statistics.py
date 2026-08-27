@@ -211,6 +211,17 @@ def binned_quantiles(
     )
 
 
+def eligible_binned_bins(
+    summary: BinnedSummary,
+    minimum_count: int,
+) -> np.ndarray:
+    """Select bins with enough rows for a stable descriptive comparison."""
+
+    if minimum_count < 1:
+        raise ValueError("minimum_count must be at least 1")
+    return np.asarray(summary.count) >= minimum_count
+
+
 def describe_values(
     catalog: str,
     class_name: str,

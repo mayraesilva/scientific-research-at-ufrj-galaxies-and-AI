@@ -15,7 +15,7 @@ from matplotlib.colors import LogNorm
 from matplotlib.figure import Figure
 
 from .selection import MorphologyMasks
-from .statistics import CompositionRow, binned_quantiles
+from .statistics import CompositionRow, binned_quantiles, eligible_binned_bins
 
 
 ETG_COLOR = "tab:red"
@@ -375,6 +375,7 @@ def plot_probability_faintness_comparison(
     highlum: Mapping[str, np.ndarray],
     highdens: Mapping[str, np.ndarray],
     magnitude_bins: np.ndarray,
+    minimum_bin_count: int,
 ) -> Figure:
     """Overlay binned MP_LTG summaries on each magnitude-density panel."""
 
@@ -407,7 +408,7 @@ def plot_probability_faintness_comparison(
             alpha=0.65,
         )
         summary = binned_quantiles(magnitude, probability, magnitude_bins)
-        populated = summary.count > 0
+        populated = eligible_binned_bins(summary, minimum_bin_count)
         axis.fill_between(
             summary.bin_centers[populated],
             summary.p25[populated],

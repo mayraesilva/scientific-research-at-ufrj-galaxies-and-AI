@@ -8,7 +8,12 @@ catalogue update cannot leave hard-coded numbers behind.
 
 import numpy as np
 
-from .statistics import BinnedSummary, CompositionRow, SummaryRow
+from .statistics import (
+    BinnedSummary,
+    CompositionRow,
+    SummaryRow,
+    eligible_binned_bins,
+)
 
 
 CLASS_LABELS = {
@@ -170,22 +175,28 @@ def brightness_size_class_interpretation(rows: list[SummaryRow]) -> str:
     )
 
 
-def faintness_interpretation(catalog: str, summary: BinnedSummary) -> str:
-    """Describe the measured endpoint change in binned median MP_LTG."""
+def faintness_interpretation(
+    catalog: str,
+    summary: BinnedSummary,
+    minimum_count: int,
+) -> str:
+    """Describe endpoints only among bins meeting an explicit occupancy rule."""
 
-    populated = np.flatnonzero(summary.count > 0)
+    populated = np.flatnonzero(eligible_binned_bins(summary, minimum_count))
     if populated.size < 2:
         return (
-            f"{catalog} has fewer than two populated magnitude bins, so this "
-            "run cannot describe a probability trend with faintness."
+            f"{catalog} has fewer than two magnitude bins with at least "
+            f"{minimum_count:,} rows, so this run cannot describe a stable "
+            "probability trend with faintness."
         )
 
     first = int(populated[0])
     last = int(populated[-1])
     return (
-        f"For {catalog}, the binned median MP_LTG changes from "
-        f"{summary.median[first]:.3f} in the brightest populated bin to "
-        f"{summary.median[last]:.3f} in the faintest populated bin. This "
+        f"Using bins with at least {minimum_count:,} rows, {catalog} has "
+        f"median MP_LTG={summary.median[first]:.3f} (n={summary.count[first]:,}) "
+        f"in the brightest eligible bin and {summary.median[last]:.3f} "
+        f"(n={summary.count[last]:,}) in the faintest eligible bin. This "
         "describes model-output structure only; these matched samples have no "
         "independent truth labels with which to measure an accuracy change."
     )

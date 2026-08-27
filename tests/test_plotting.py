@@ -146,6 +146,7 @@ def test_probability_faintness_overlays_binned_median_and_iqr():
         SYNTHETIC_HIGHLUM,
         SYNTHETIC_HIGHDENS,
         np.array([18.0, 19.0, 20.0, 21.0]),
+        minimum_bin_count=1,
     )
 
     for axis in figure.axes[:2]:
@@ -153,6 +154,25 @@ def test_probability_faintness_overlays_binned_median_and_iqr():
         assert len(axis.collections) >= 2
         assert axis.get_xlabel().endswith("(fainter →)")
         assert axis.get_ylim() == pytest.approx((0.0, 1.0))
+    plt.close(figure)
+
+
+def test_probability_faintness_excludes_sparse_bins_from_summary_line():
+    """Catch an unstable one-row endpoint being drawn as a catalogue trend."""
+
+    data = {
+        "MAG_AUTO_R": np.array([18.1, 19.1, 19.2, 19.3]),
+        "MP_LTG": np.array([0.9, 0.2, 0.3, 0.4]),
+    }
+    figure = plot_probability_faintness_comparison(
+        data,
+        data,
+        np.array([18.0, 19.0, 20.0]),
+        minimum_bin_count=3,
+    )
+
+    for axis in figure.axes[:2]:
+        np.testing.assert_allclose(axis.lines[0].get_xdata(), [19.5])
     plt.close(figure)
 
 

@@ -6,6 +6,7 @@ from src.galaxy_analysis.statistics import (
     compare_catalog_summaries,
     composition_rows,
     describe_values,
+    eligible_binned_bins,
     flag_count_rows,
     model_dispersion,
     threshold_rows,
@@ -84,6 +85,20 @@ def test_binned_quantiles_reject_nonincreasing_edges():
             y=np.array([0.4]),
             bin_edges=np.array([18.0, 20.0, 19.0]),
         )
+
+
+def test_eligible_binned_bins_enforces_minimum_occupancy():
+    """Catch sparse bins being treated as stable descriptive endpoints."""
+
+    result = binned_quantiles(
+        x=np.array([18.1, 19.1, 19.2]),
+        y=np.array([0.9, 0.2, 0.4]),
+        bin_edges=np.array([18.0, 19.0, 20.0]),
+    )
+
+    np.testing.assert_array_equal(eligible_binned_bins(result, 2), [False, True])
+    with pytest.raises(ValueError, match="at least 1"):
+        eligible_binned_bins(result, 0)
 
 
 def test_describe_values_uses_sample_standard_deviation():
