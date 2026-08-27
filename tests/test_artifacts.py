@@ -7,6 +7,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
+import numpy as np
 from PIL import Image
 import pytest
 
@@ -63,3 +64,23 @@ def test_write_json_round_trips_the_same_payload(tmp_path):
     path = write_json(tmp_path / "metadata.json", payload)
 
     assert json.loads(path.read_text(encoding="utf-8")) == payload
+
+
+def test_write_json_normalizes_research_metadata_types(tmp_path):
+    """Catch NumPy and path values that break real notebook metadata writes."""
+
+    payload = {
+        "count": np.int64(3),
+        "fraction": np.float64(0.5),
+        "indices": np.array([1, 2]),
+        "path": tmp_path / "catalogue.fits",
+    }
+
+    path = write_json(tmp_path / "metadata.json", payload)
+
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        "count": 3,
+        "fraction": 0.5,
+        "indices": [1, 2],
+        "path": str(tmp_path / "catalogue.fits"),
+    }

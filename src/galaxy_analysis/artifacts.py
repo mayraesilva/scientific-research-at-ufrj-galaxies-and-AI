@@ -11,6 +11,19 @@ from pathlib import Path
 from typing import Any
 
 from matplotlib.figure import Figure
+import numpy as np
+
+
+def _json_default(value: Any) -> Any:
+    """Convert common research scalar, array, and path types for JSON."""
+
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, Path):
+        return str(value)
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def find_project_root(start: Path, configured: Path | None = None) -> Path:
@@ -62,7 +75,12 @@ def write_json(path: Path, payload: Mapping[str, Any]) -> Path:
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        json.dumps(payload, indent=2, sort_keys=True),
+        json.dumps(
+            payload,
+            indent=2,
+            sort_keys=True,
+            default=_json_default,
+        ),
         encoding="utf-8",
     )
     return path
