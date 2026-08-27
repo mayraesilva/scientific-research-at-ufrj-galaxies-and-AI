@@ -200,6 +200,29 @@ def test_completed_front_half_contains_no_incomplete_execution_guards():
         assert incomplete_raises == []
 
 
+def test_highlum_baseline_gate_runs_before_highdens_data_loading():
+    """Catch loading the 1.27-GB comparison file before the baseline gate."""
+
+    notebook = load_notebook()
+    ordered_ids = [cell.id for cell in notebook.cells]
+    assert ordered_ids.index("load-and-validate-catalogues") < ordered_ids.index(
+        "validate-highdens"
+    )
+
+    highlum_source = next(
+        cell.source
+        for cell in notebook.cells
+        if cell.id == "load-and-validate-catalogues"
+    )
+    highdens_source = next(
+        cell.source for cell in notebook.cells if cell.id == "validate-highdens"
+    )
+    assert 'read_columns(CATALOG_PATHS["highlum"]' in highlum_source
+    assert "require_catalogue_baseline" in highlum_source
+    assert 'read_columns(CATALOG_PATHS["highdens"]' in highdens_source
+    assert "expected_row_count" not in highdens_source
+
+
 def test_complete_notebook_has_every_analysis_and_artifact_cell():
     """Catch a scientific section that remains prose without execution."""
 
