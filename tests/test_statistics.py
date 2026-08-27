@@ -2,13 +2,88 @@ import numpy as np
 import pytest
 
 from src.galaxy_analysis.statistics import (
+    binned_quantiles,
     compare_catalog_summaries,
+    composition_rows,
     describe_values,
     flag_count_rows,
     model_dispersion,
     threshold_rows,
     wilson_interval,
 )
+
+
+def test_composition_rows_group_only_flags_4_and_5_as_robust():
+    """Catch accidental parity selection or loss of excluded flags."""
+
+    rows = composition_rows("sample", np.array([0, 1, 2, 3, 4, 4, 5]))
+    by_class = {row.class_name: row for row in rows}
+
+    assert by_class["robust_etg"].count == 2
+    assert by_class["robust_ltg"].count == 1
+    assert by_class["other_flags"].count == 4
+    assert sum(row.fraction_of_total for row in rows) == pytest.approx(1.0)
+
+
+def test_composition_rows_include_counting_precision():
+    """Catch grouped rows that omit their Wilson counting intervals."""
+
+    rows = composition_rows("sample", np.array([4, 4, 5, 0]))
+
+    assert all(row.wilson_low_95 is not None for row in rows)
+    assert all(row.wilson_high_95 is not None for row in rows)
+
+
+def test_binned_quantiles_return_counts_median_and_iqr():
+    """Catch incorrect bin membership or quartile ordering."""
+
+    result = binned_quantiles(
+        x=np.array([18.1, 18.2, 19.1, 19.2]),
+        y=np.array([0.0, 0.2, 0.8, 1.0]),
+        bin_edges=np.array([18.0, 19.0, 20.0]),
+    )
+
+    np.testing.assert_array_equal(result.count, [2, 2])
+    np.testing.assert_allclose(result.median, [0.1, 0.9])
+    np.testing.assert_allclose(result.p25, [0.05, 0.85])
+    np.testing.assert_allclose(result.p75, [0.15, 0.95])
+
+
+def test_binned_quantiles_mark_empty_bins_with_nan():
+    """Catch fabricated zero-valued statistics for empty magnitude bins."""
+
+    result = binned_quantiles(
+        x=np.array([18.2]),
+        y=np.array([0.4]),
+        bin_edges=np.array([18.0, 19.0, 20.0]),
+    )
+
+    assert result.count.tolist() == [1, 0]
+    assert np.isnan(result.median[1])
+
+
+def test_binned_quantiles_include_the_final_right_edge():
+    """Catch loss of the faintest value when it equals the pooled maximum."""
+
+    result = binned_quantiles(
+        x=np.array([18.0, 19.0, 20.0]),
+        y=np.array([0.1, 0.5, 0.9]),
+        bin_edges=np.array([18.0, 19.0, 20.0]),
+    )
+
+    assert result.count.tolist() == [1, 2]
+    assert result.median[1] == pytest.approx(0.7)
+
+
+def test_binned_quantiles_reject_nonincreasing_edges():
+    """Catch ambiguous or overlapping bin definitions."""
+
+    with pytest.raises(ValueError, match="increasing"):
+        binned_quantiles(
+            x=np.array([18.2]),
+            y=np.array([0.4]),
+            bin_edges=np.array([18.0, 20.0, 19.0]),
+        )
 
 
 def test_describe_values_uses_sample_standard_deviation():

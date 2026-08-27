@@ -80,6 +80,30 @@ class ComparisonRow:
     fraction_difference: float
 
 
+@dataclass(frozen=True)
+class CompositionRow:
+    """One mutually exclusive morphology group in a matched catalogue."""
+
+    catalog: str
+    class_name: str
+    count: int
+    fraction_of_total: float
+    wilson_low_95: float | None
+    wilson_high_95: float | None
+
+
+@dataclass(frozen=True)
+class BinnedSummary:
+    """Counts and y-distribution quartiles measured in fixed x intervals."""
+
+    bin_edges: np.ndarray
+    bin_centers: np.ndarray
+    count: np.ndarray
+    median: np.ndarray
+    p25: np.ndarray
+    p75: np.ndarray
+
+
 def wilson_interval(count: int, total: int) -> tuple[float | None, float | None]:
     """Return the two-sided 95% Wilson interval for a binomial proportion.
 
@@ -100,6 +124,91 @@ def wilson_interval(count: int, total: int) -> tuple[float | None, float | None]
         proportion * (1 - proportion) / total + z**2 / (4 * total**2)
     ) / denominator
     return max(0.0, center - half_width), min(1.0, center + half_width)
+
+
+def composition_rows(catalog: str, flags: np.ndarray) -> list[CompositionRow]:
+    """Group robust ETGs, robust LTGs, and all flags excluded from analysis.
+
+    The groups are deliberately mutually exclusive.  Keeping flags 0-3 in one
+    explicit group shows how much of each matched catalogue is not used in the
+    primary robust comparison without relabelling those objects by parity.
+    """
+
+    flags = np.asarray(flags)
+    masks = {
+        "robust_etg": flags == 4,
+        "robust_ltg": flags == 5,
+        "other_flags": ~np.isin(flags, (4, 5)),
+    }
+    total = int(flags.size)
+    rows = []
+
+    for class_name, mask in masks.items():
+        count = int(np.count_nonzero(mask))
+        low, high = wilson_interval(count, total)
+        rows.append(
+            CompositionRow(
+                catalog=catalog,
+                class_name=class_name,
+                count=count,
+                fraction_of_total=count / total if total else 0.0,
+                wilson_low_95=low,
+                wilson_high_95=high,
+            )
+        )
+
+    return rows
+
+
+def binned_quantiles(
+    x: np.ndarray,
+    y: np.ndarray,
+    bin_edges: np.ndarray,
+) -> BinnedSummary:
+    """Summarize finite y values inside fixed, increasing x intervals.
+
+    Empty bins remain ``NaN`` instead of receiving invented zero-valued
+    statistics.  This makes gaps explicit when the binned median and
+    interquartile band are drawn over the probability-density figures.
+    """
+
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    edges = np.asarray(bin_edges, dtype=float)
+
+    if edges.ndim != 1 or edges.size < 2 or np.any(np.diff(edges) <= 0):
+        raise ValueError("bin_edges must be one-dimensional and increasing")
+
+    valid = np.isfinite(x) & np.isfinite(y)
+    valid_x = x[valid]
+    bin_count = edges.size - 1
+    bin_index = np.digitize(valid_x, edges, right=False) - 1
+    # NumPy assigns the final right edge beyond the last half-open interval.
+    # Include that one boundary so a pooled maximum is not silently discarded.
+    bin_index[valid_x == edges[-1]] = bin_count - 1
+    values = y[valid]
+    count = np.zeros(bin_count, dtype=int)
+    median = np.full(bin_count, np.nan)
+    p25 = np.full(bin_count, np.nan)
+    p75 = np.full(bin_count, np.nan)
+
+    for index in range(bin_count):
+        selected = values[bin_index == index]
+        count[index] = selected.size
+        if selected.size:
+            p25[index], median[index], p75[index] = np.percentile(
+                selected,
+                [25, 50, 75],
+            )
+
+    return BinnedSummary(
+        bin_edges=edges,
+        bin_centers=(edges[:-1] + edges[1:]) / 2,
+        count=count,
+        median=median,
+        p25=p25,
+        p75=p75,
+    )
 
 
 def describe_values(
