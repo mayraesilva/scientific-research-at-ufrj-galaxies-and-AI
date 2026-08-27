@@ -145,6 +145,7 @@ def test_front_half_has_executable_analysis_cells():
     cell_ids = {cell.id for cell in load_notebook().cells}
     required = {
         "configuration",
+        "catalogue-role-table",
         "load-and-validate-catalogues",
         "prepare-robust-summaries",
         "figure-01-composition",
@@ -155,6 +156,21 @@ def test_front_half_has_executable_analysis_cells():
         "figure-03-interpretation",
     }
     assert required <= cell_ids
+
+
+def test_catalogue_role_table_distinguishes_inputs_before_analysis():
+    """Catch source, parent, and matched files being presented as equivalent."""
+
+    notebook = load_notebook()
+    source = next(
+        cell.source for cell in notebook.cells if cell.id == "catalogue-role-table"
+    )
+
+    assert '"parent_morphology"' in source
+    assert '"highlum_source"' in source
+    assert '"highdens_source"' in source
+    assert '"highlum"' in source and '"highdens"' in source
+    assert '"directly_analyzed"' in source
 
 
 def test_configuration_resolves_project_and_reproducibility_constants(monkeypatch):
@@ -303,6 +319,8 @@ def test_run_metadata_only_inventories_products_from_the_current_notebook():
     assert '"advisor_summary.md"' in source
     assert '"highdens_minus_highlum.csv"' in source
     assert '"sample_indices.npy"' in source
+    assert '"git_dirty"' in source
+    assert '["git", "status", "--porcelain"]' in source
 
 
 def test_notebook_code_cells_keep_readable_line_lengths():
