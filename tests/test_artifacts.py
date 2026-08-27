@@ -15,6 +15,7 @@ from src.galaxy_analysis.artifacts import (
     find_project_root,
     save_figure,
     write_json,
+    write_text,
 )
 
 
@@ -84,3 +85,12 @@ def test_write_json_normalizes_research_metadata_types(tmp_path):
         "indices": [1, 2],
         "path": str(tmp_path / "catalogue.fits"),
     }
+
+
+def test_write_text_creates_a_utf8_artifact_with_one_final_newline(tmp_path):
+    """Catch advisor summaries with unstable whitespace or missing folders."""
+
+    path = write_text(tmp_path / "reports" / "advisor_summary.md", "Results\n\n")
+
+    assert path == tmp_path / "reports" / "advisor_summary.md"
+    assert path.read_bytes() == b"Results\n"

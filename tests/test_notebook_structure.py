@@ -276,6 +276,7 @@ def test_run_metadata_only_inventories_products_from_the_current_notebook():
     assert ".rglob(" not in source
     assert "saved_figures" in source
     assert "generated_product_paths" in source
+    assert '"advisor_summary.md"' in source
     assert '"highdens_minus_highlum.csv"' in source
     assert '"sample_indices.npy"' in source
 

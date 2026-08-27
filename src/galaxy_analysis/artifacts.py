@@ -84,3 +84,11 @@ def write_json(path: Path, payload: Mapping[str, Any]) -> Path:
         encoding="utf-8",
     )
     return path
+
+
+def write_text(path: Path, content: str) -> Path:
+    """Write normalized UTF-8 text and return its reproducible artifact path."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content.rstrip() + "\n", encoding="utf-8")
+    return path
