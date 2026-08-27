@@ -308,6 +308,93 @@ def plot_magnitude_radius_comparison(
     return figure
 
 
+def plot_custom_magnitude_radius_comparison(
+    highlum: Mapping[str, np.ndarray],
+    highdens: Mapping[str, np.ndarray],
+    highlum_xlim: tuple[float, float] = (21.5, 20.5),
+    highlum_ylim: tuple[float, float] = (2.5, 7.5),
+    highdens_ylim: tuple[float, float] = (2.5, 7.5),
+) -> Figure:
+    """Show customized brightness-radius density panels with tailored axes.
+
+    The highlum panel focuses on the zoomed window (MAG_AUTO_R from 21.5 to
+    20.5 and radius from 2.5 to 7.5 pixels). The highdens panel preserves its
+    full magnitude extent while stopping the radius at 7.5 pixels.
+    """
+
+    figure, axes = plt.subplots(
+        1,
+        2,
+        figsize=(13, 5),
+        layout="constrained",
+    )
+
+    # Left: highlum with custom x and y limits
+    mag_hl = np.asarray(highlum["MAG_AUTO_R"], dtype=float)
+    rad_hl = np.asarray(highlum["FLUX_RADIUS_R"], dtype=float)
+    valid_hl = _finite_pair(mag_hl, rad_hl) & (rad_hl > 0)
+    extent_hl = (
+        min(highlum_xlim),
+        max(highlum_xlim),
+        min(highlum_ylim),
+        max(highlum_ylim),
+    )
+    density_hl = axes[0].hexbin(
+        mag_hl[valid_hl],
+        rad_hl[valid_hl],
+        gridsize=70,
+        bins="log",
+        mincnt=1,
+        extent=extent_hl,
+        cmap="viridis",
+    )
+    axes[0].set_xlim(*highlum_xlim)
+    axes[0].set_ylim(*highlum_ylim)
+    axes[0].set_title("highlum (zoomed: 21.5 to 20.5 mag, 2.5 to 7.5 px)")
+    axes[0].set_xlabel("MAG_AUTO_R [mag] (brighter ←)")
+    axes[0].set_ylabel("FLUX_RADIUS_R [pixel]")
+    figure.colorbar(
+        density_hl,
+        ax=axes[0],
+        label="Logarithmic count per hexagonal bin",
+    )
+
+    # Right: highdens with unchanged x extent, y up to 7.5
+    mag_hd = np.asarray(highdens["MAG_AUTO_R"], dtype=float)
+    rad_hd = np.asarray(highdens["FLUX_RADIUS_R"], dtype=float)
+    valid_hd = _finite_pair(mag_hd, rad_hd) & (rad_hd > 0)
+    hd_mag_min = float(np.nanmin(mag_hd[valid_hd]))
+    hd_mag_max = float(np.nanmax(mag_hd[valid_hd]))
+    extent_hd = (
+        hd_mag_min,
+        hd_mag_max,
+        min(highdens_ylim),
+        max(highdens_ylim),
+    )
+    density_hd = axes[1].hexbin(
+        mag_hd[valid_hd],
+        rad_hd[valid_hd],
+        gridsize=70,
+        bins="log",
+        mincnt=1,
+        extent=extent_hd,
+        cmap="viridis",
+    )
+    axes[1].set_xlim(hd_mag_max, hd_mag_min)
+    axes[1].set_ylim(*highdens_ylim)
+    axes[1].set_title("highdens (radius 2.5 to 7.5 px)")
+    axes[1].set_xlabel("MAG_AUTO_R [mag] (brighter ←)")
+    axes[1].set_ylabel("FLUX_RADIUS_R [pixel]")
+    figure.colorbar(
+        density_hd,
+        ax=axes[1],
+        label="Logarithmic count per hexagonal bin",
+    )
+
+    figure.suptitle("Apparent magnitude and half-light radius (custom limits)")
+    return figure
+
+
 def plot_morphology_brightness_size_comparison(
     highlum: Mapping[str, np.ndarray],
     highlum_masks: MorphologyMasks,

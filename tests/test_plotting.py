@@ -12,6 +12,7 @@ import pytest
 
 from src.galaxy_analysis.plotting import (
     plot_catalogue_composition,
+    plot_custom_magnitude_radius_comparison,
     plot_magnitude_radius_comparison,
     plot_model_disagreement_comparison,
     plot_morphology_brightness_size_comparison,
@@ -116,6 +117,25 @@ def test_magnitude_radius_comparison_uses_shared_inverted_axes():
     assert left.xaxis_inverted() and right.xaxis_inverted()
     assert left.get_ylabel() == "FLUX_RADIUS_R [pixel]"
     assert left.collections[0].norm is right.collections[0].norm
+    plt.close(figure)
+
+
+def test_custom_magnitude_radius_comparison_applies_tailored_limits():
+    """Catch custom limits not being applied to highlum or highdens."""
+
+    figure = plot_custom_magnitude_radius_comparison(
+        SYNTHETIC_HIGHLUM,
+        SYNTHETIC_HIGHDENS,
+        highlum_xlim=(21.5, 20.5),
+        highlum_ylim=(2.5, 7.5),
+        highdens_ylim=(2.5, 7.5),
+    )
+    left, right = figure.axes[:2]
+
+    assert left.get_xlim() == pytest.approx((21.5, 20.5))
+    assert left.get_ylim() == pytest.approx((2.5, 7.5))
+    assert right.get_ylim() == pytest.approx((2.5, 7.5))
+    assert left.xaxis_inverted()
     plt.close(figure)
 
 
