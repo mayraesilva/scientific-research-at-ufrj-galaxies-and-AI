@@ -267,6 +267,19 @@ def test_parent_sample_cell_saves_unique_sorted_indices_only(tmp_path):
     ]
 
 
+def test_run_metadata_only_inventories_products_from_the_current_notebook():
+    """Catch legacy files being reported as products of the current run."""
+
+    notebook = load_notebook()
+    source = next(cell.source for cell in notebook.cells if cell.id == "run-metadata")
+
+    assert ".rglob(" not in source
+    assert "saved_figures" in source
+    assert "generated_product_paths" in source
+    assert '"highdens_minus_highlum.csv"' in source
+    assert '"sample_indices.npy"' in source
+
+
 def test_notebook_code_cells_keep_readable_line_lengths():
     """Catch dense code that becomes hard to review inside Jupyter."""
 
