@@ -1,11 +1,20 @@
-# A reproducible comparison of DES galaxy-morphology catalogues
+# Galaxy Morphology with DES and Artificial Intelligence 🌌🤖
 
-## Methodological and scientific guide to the analysis notebook
+Welcome to the methodological and scientific guide for the robust morphology
+analysis notebook!
+
+This document explains the research motivation, catalogue terminology,
+variables, analysis choices, figures, results, and limitations in the same
+accessible astronomy-and-AI style used by the source repository. The scientific
+language remains deliberately cautious: reproducible catalogue differences are
+reported as associations, not as causal environmental effects.
 
 **Companion notebook:**
 [`01_robust_morphology_environment_analysis.ipynb`](01_robust_morphology_environment_analysis.ipynb)
 
-## Abstract
+---
+
+## 📖 Project Overview
 
 This notebook develops a reproducible descriptive comparison of two selected
 galaxy catalogues, identified in the project as `highlum` and `highdens`, after
@@ -35,7 +44,9 @@ have not yet been fully documented.
 networks; early-type galaxies; late-type galaxies; catalogue validation;
 reproducible research.
 
-## 1. Scientific motivation
+---
+
+## 🌌 Scientific Motivation
 
 Modern imaging surveys contain far more galaxies than can be classified
 manually. Automated morphology catalogues therefore use machine-learning models
@@ -62,9 +73,11 @@ This order matters. Validation precedes interpretation, sample composition
 precedes distribution comparison, and descriptive results precede physical
 claims.
 
-## 2. Meaning of `highlum`, `highdens`, and the other catalogues
+---
 
-### 2.1 Catalogue roles
+## 🗂️ Data and Catalogue Names
+
+### Catalogue roles
 
 | Notebook alias | Local file | Rows | Role in this study |
 | --- | --- | ---: | --- |
@@ -74,7 +87,7 @@ claims.
 | `highlum` | `data/processed/crossmatches/vega-ferrero/match_VF_highlum.fits` | 34,768 | `highlum_source` records matched to the Vega-Ferrero morphology information; directly analyzed. |
 | `highdens` | `data/processed/crossmatches/vega-ferrero/match_VF_highdens.fits` | 905,291 | `highdens_source` records matched to the Vega-Ferrero morphology information; directly analyzed. |
 
-### 2.2 What `highlum` means
+### What `highlum` means
 
 `highlum` is a short project alias for the matched product derived from
 `redspell_highlum7_final.fits`. The name indicates that the upstream source
@@ -89,7 +102,7 @@ apparent magnitude, not an absolute luminosity, and the physical meaning of the
 upstream selection must be confirmed with the advisor or the catalogue-
 construction documentation.
 
-### 2.3 What `highdens` means
+### What `highdens` means
 
 `highdens` is the corresponding alias for the matched product derived from
 `redspell_highdens7_final.fits`. Its name indicates that the upstream source
@@ -102,7 +115,7 @@ environmental-density variable. It compares the supplied product with
 `highlum` and reports the association. A causal environmental interpretation
 is deliberately deferred.
 
-### 2.4 Why the source and matched catalogues are kept separate
+### Why the source and matched catalogues are kept separate
 
 The source catalogues describe the upstream red-sequence selections. The
 matched products combine those selections with morphology fields. Only the
@@ -111,12 +124,14 @@ figures. Keeping the roles explicit prevents the analysis from silently
 treating a parent catalogue, a source-selection catalogue, and a cross-match as
 equivalent datasets.
 
-## 3. Input-variable dictionary
+---
+
+## 📚 Input-Variable Dictionary
 
 The notebook loads 21 columns from each matched product. The definitions below
 describe how each name is used in this analysis.
 
-### 3.1 Identifiers and matched coordinates
+### Identifiers and matched coordinates
 
 | Variable | Meaning | Unit or domain | Use |
 | --- | --- | --- | --- |
@@ -130,7 +145,7 @@ The suffix `_2` is a cross-match naming convention. It identifies columns
 originating from the second matched table; it does not mean a second
 observation or a second physical coordinate system.
 
-### 3.2 Observed photometric and image-plane quantities
+### Observed photometric and image-plane quantities
 
 | Variable | Meaning | Unit | Interpretive boundary |
 | --- | --- | --- | --- |
@@ -141,7 +156,7 @@ The `_R` suffix denotes the DES r band. The notebook inverts the magnitude axis
 in brightness-size figures so that brighter objects appear on the left, in
 accordance with the astronomical magnitude convention.
 
-### 3.3 Five-model LTG probabilities
+### Five-model LTG probabilities
 
 | Variable | Meaning | Domain |
 | --- | --- | --- |
@@ -162,7 +177,7 @@ classification accuracy.
 `MP_LTG` as a continuous model summary, while `FLAG_LTG` supplies the catalogue
 decision tier used for robust sample selection.
 
-### 3.4 Five-model edge-on probabilities
+### Five-model edge-on probabilities
 
 | Variable | Meaning | Domain |
 | --- | --- | --- |
@@ -178,7 +193,7 @@ form a third morphology class alongside ETG and LTG. Projection can obscure
 disks and spiral structure, which is why the notebook compares `MP_EdgeOn` and
 `MP_LTG` jointly rather than interpreting them as interchangeable labels.
 
-### 3.5 Catalogue flags
+### Catalogue flags
 
 | Variable or value | Meaning in this notebook | Primary-sample status |
 | --- | --- | --- |
@@ -192,9 +207,11 @@ The primary masks use exact equality with flags 4 and 5. An even/odd shortcut
 would incorrectly promote non-robust rows into the robust analysis and is
 therefore prohibited.
 
-## 4. Derived analysis variables
+---
 
-### 4.1 Morphology masks and catalogue groups
+## 🧮 Derived Analysis Variables
+
+### Morphology masks and catalogue groups
 
 | Derived name | Definition | Purpose |
 | --- | --- | --- |
@@ -205,7 +222,7 @@ therefore prohibited.
 | `other_flags` | Composition-table group containing `FLAG_LTG` values 0–3. | Show how much of each matched catalogue is outside the primary robust sample. |
 | `all_valid` | All finite rows for the variable being summarized. | Describe the complete matched product without applying the robust-class mask. |
 
-### 4.2 Model-disagreement variables
+### Model-disagreement variables
 
 For each row, the five LTG outputs are assembled into a vector. The helper
 `model_dispersion` calculates:
@@ -222,7 +239,7 @@ These quantities do not include training-label uncertainty, common model bias,
 image artifacts, source-selection effects, or domain shift. They are not a
 complete predictive-uncertainty model.
 
-### 4.3 Binned faintness summaries
+### Binned faintness summaries
 
 The combined finite `MAG_AUTO_R` range is divided into 12 fixed intervals. For
 each catalogue and interval, the notebook calculates:
@@ -241,7 +258,7 @@ median line, interquartile band, and natural-language endpoint comparison. This
 rule prevents a one-object bright bin from being presented as a catalogue-wide
 trend.
 
-### 4.4 Descriptive-statistics fields
+### Descriptive-statistics fields
 
 Each `SummaryRow` stored in `summary_statistics.csv` contains:
 
@@ -260,7 +277,7 @@ Each `SummaryRow` stored in `summary_statistics.csv` contains:
 | `p05`, `p25`, `p75`, `p95` | 5th, 25th, 75th, and 95th percentiles. |
 | `iqr` | Interquartile range, `p75 - p25`. |
 
-### 4.5 Composition, threshold, and comparison fields
+### Composition, threshold, and comparison fields
 
 `morphology_composition.csv` stores the class count, full-catalogue fraction,
 and two-sided 95% Wilson interval. Wilson intervals were chosen because they
@@ -283,7 +300,9 @@ Thus a positive `median_difference` or `fraction_difference` means that the
 reported quantity is larger in `highdens`; a negative value means that it is
 larger in `highlum`.
 
-## 5. Reproducibility constants
+---
+
+## ⚙️ Reproducibility Settings
 
 | Constant | Value | Why it exists |
 | --- | ---: | --- |
@@ -298,9 +317,11 @@ Sampling is used only where point rendering would otherwise be unnecessarily
 expensive. Counts, percentiles, masks, and catalogue interpretations continue
 to use all valid rows.
 
-## 6. Methodology: what was done and why
+---
 
-### 6.1 Memory-conscious catalogue access
+## 🛠️ Methodology: What Was Done and Why
+
+### Memory-conscious catalogue access
 
 The FITS files range from tens of megabytes to several gigabytes. The workflow
 first inspects the table schema through memory-mapped FITS access and then
@@ -308,7 +329,7 @@ copies only the 21 required columns. It does not load every column merely to
 discover the file structure. This reduces memory use and makes the scientific
 dependency on each column explicit.
 
-### 6.2 Highlum-first quality gate
+### Highlum-first quality gate
 
 The smaller `highlum` matched file is read and validated before the 1.27-GB
 `highdens` product is loaded. This ordering is intentional: if the known
@@ -344,7 +365,7 @@ For both matched products, the gate verifies:
 No invalid or duplicated rows are silently dropped. A failed gate stops the
 analysis.
 
-### 6.3 Robust sample definition
+### Robust sample definition
 
 The primary morphology comparison follows Vega-Ferrero et al. (2021), Table 6:
 
@@ -356,7 +377,7 @@ robust_ltg = FLAG_LTG == 5
 Flags 0–3 remain visible in the composition figure and table. This choice
 avoids hiding the fraction excluded by the robust selection.
 
-### 6.4 Statistical summaries
+### Statistical summaries
 
 Finite values are summarized using counts, means, medians, sample standard
 deviations, fixed percentiles, and interquartile ranges. Class fractions are
@@ -368,7 +389,7 @@ No null-hypothesis significance test is applied. Such a test would require a
 clear sampling model, known selection functions, and a treatment of dependence
 between the matched samples. Those conditions are not yet established.
 
-### 6.5 Matplotlib design and artifact saving
+### Matplotlib design and artifact saving
 
 All figures are constructed with Matplotlib. Reusable plotting functions
 return `matplotlib.figure.Figure` objects and do not read data, save files, or
@@ -380,7 +401,7 @@ Paired plots use common axes and bins. Figures 4 and 7 also share one
 logarithmic color normalization between catalogue panels, so the same color
 represents the same hexagonal-bin count in both products.
 
-### 6.6 Deterministic sampling
+### Deterministic sampling
 
 The sky figure uses at most 100,000 deterministic rows per matched catalogue
 for point rendering. Coordinate extents and reported footprint descriptions use
@@ -388,7 +409,9 @@ all valid coordinates. The parent morphology artifact stores 100,000 unique,
 sorted row **indices**, not copied catalogue values. This makes a later
 extraction reproducible without duplicating a multi-gigabyte scientific input.
 
-## 7. Figure programme and scientific rationale
+---
+
+## 📊 Figure Guide and Scientific Rationale
 
 | Figure | Scientific question | Method | Why this design was chosen |
 | ---: | --- | --- | --- |
@@ -405,12 +428,14 @@ extraction reproducible without duplicating a multi-gigabyte scientific input.
 Every primary figure is immediately followed in the notebook by a calculated
 interpretation and a separate “Careful interpretation” section.
 
-## 8. Principal results from the verified run
+---
+
+## 🔬 Principal Results from the Verified Run
 
 These values describe the local catalogues executed at Git commit `c42732c`.
 They are not universal properties of DES galaxies.
 
-### 8.1 Catalogue quality
+### Catalogue quality
 
 Both matched products passed the adopted quality gate:
 
@@ -419,7 +444,7 @@ Both matched products passed the adopted quality gate:
 | `highlum` | 34,768 | 191 | 0 | 0 | 0 | 0 | 0 | 0 |
 | `highdens` | 905,291 | 191 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-### 8.2 Robust composition
+### Robust composition
 
 | Catalogue | Robust ETG | ETG fraction | Robust LTG | LTG fraction | Other flags | Other fraction |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -431,7 +456,7 @@ approximately **+4.35 percentage points**. This difference can reflect the
 upstream source selections and must not be attributed to environment without a
 selection-function analysis.
 
-### 8.3 Classification probabilities and model disagreement
+### Classification probabilities and model disagreement
 
 - Robust ETG median `MP_LTG` is 0.0015 in `highlum` and 0.0255 in `highdens`.
 - Robust LTG median `MP_LTG` is 0.9689 in `highlum` and 0.9524 in `highdens`.
@@ -443,7 +468,7 @@ because the robust flags themselves are constructed from agreement among these
 model outputs. Figure 2 is therefore an internal-consistency check, not an
 independent accuracy measurement.
 
-### 8.4 Brightness and image-plane size
+### Brightness and image-plane size
 
 The central 90% `highlum` locus spans approximately `MAG_AUTO_R = 20.82–21.47`
 mag and `FLUX_RADIUS_R = 3.27–5.18` pixels. Its median radius changes from 4.36
@@ -461,7 +486,7 @@ larger than the robust-ETG median. Within `highdens`, it is 0.19 mag fainter and
 approximately equal in median radius. These are differences in related imaging
 measurements, not an independent physical morphology-size test.
 
-### 8.5 Faintness structure
+### Faintness structure
 
 Using only magnitude bins with at least 100 rows:
 
@@ -474,7 +499,7 @@ This is a change in model-output structure. It is not evidence of a change in
 classification accuracy because the matched products do not supply independent
 truth labels.
 
-### 8.6 Orientation output
+### Orientation output
 
 In `highlum`, 82.3% of valid rows have `MP_EdgeOn <= 0.05`. Median
 `MP_EdgeOn` is 0.008 when `MP_LTG <= 0.2` and 0.064 when `MP_LTG >= 0.8`.
@@ -483,7 +508,7 @@ In `highdens`, 87.2% of valid rows have `MP_EdgeOn <= 0.05`. The corresponding
 medians are 0.003 and 0.011. Projection can hide disk structure, so these joint
 patterns require orientation-aware interpretation.
 
-### 8.7 Sky footprint
+### Sky footprint
 
 The `highlum` matched coordinates occupy a wrapped right-ascension arc from
 approximately 313.60 degrees through zero to 90.36 degrees, with declination
@@ -494,7 +519,7 @@ Visible holes may be survey boundaries or bright-star masks. They are not
 evidence of physical galaxy underdensities without an official survey mask and
 selection analysis.
 
-### 8.8 Coordinate-match quality
+### Coordinate-match quality
 
 The median, 95th percentile, and maximum separations are:
 
@@ -507,7 +532,9 @@ All rows remain inside the adopted one-arcsecond angular tolerance. The rare
 tail, especially the `highdens` maximum near the limit, is retained in the
 reported interpretation rather than hidden by the narrow central distribution.
 
-## 9. Scientific limitations
+---
+
+## ⚠️ Scientific Limitations
 
 The notebook is deliberately descriptive. Its principal limitations are:
 
@@ -527,7 +554,9 @@ The notebook is deliberately descriptive. Its principal limitations are:
    Fabrício, so the Ferrari et al. morphometric analysis remains deferred.
 8. No causal environmental inference is supported at this stage.
 
-## 10. Reproducibility and software organization
+---
+
+## 🧪 Reproducibility and Software Organization
 
 Reusable work is separated from notebook narration:
 
@@ -551,9 +580,11 @@ The verified software environment used Python 3.13.2, NumPy 2.5.1, Astropy
 input sizes and timestamps, Git commit, dirty-tree status, parameters,
 warnings, and product names for each execution.
 
-## 11. Running the notebook
+---
 
-### 11.1 Prepare the environment
+## 🚀 Getting Started
+
+### Prepare the environment
 
 From the repository root:
 
@@ -567,7 +598,7 @@ Place the local FITS catalogues in the paths documented in
 [`../data/README.md`](../data/README.md). The FITS files are scientific inputs
 and must remain excluded from Git.
 
-### 11.2 Interactive execution
+### Interactive execution
 
 ```bash
 jupyter lab notebooks/01_robust_morphology_environment_analysis.ipynb
@@ -576,7 +607,7 @@ jupyter lab notebooks/01_robust_morphology_environment_analysis.ipynb
 Run cells from top to bottom. If Jupyter is launched outside the repository,
 set `GALAXY_PROJECT_ROOT` to the repository root before starting it.
 
-### 11.3 Clean-kernel verification without modifying the tracked notebook
+### Clean-kernel verification without modifying the tracked notebook
 
 ```bash
 GALAXY_PROJECT_ROOT="$PWD" \
@@ -598,7 +629,9 @@ MPLBACKEND=Agg python -m pytest -q
 Before committing, verify that the tracked notebook is still output-free and
 that no FITS file or generated artifact is staged.
 
-## 12. Generated artifacts
+---
+
+## 📁 Generated Artifacts
 
 Each execution recreates the following ignored products below
 `outputs/meeting-2026-07-13/`:
@@ -632,7 +665,9 @@ These files are reproducible research products, not source files. They remain
 ignored so the repository stays clean and does not accumulate generated binary
 figures, execution-specific metadata, or large extracted data.
 
-## 13. Questions for the next advisor meeting
+---
+
+## 📌 Questions for the Next Advisor Meeting
 
 1. What exact luminosity, density, redshift, and membership rules define the
    upstream `highlum` and `highdens` source selections?
@@ -647,7 +682,9 @@ figures, execution-specific metadata, or large extracted data.
 6. Which statistical comparison is appropriate after the selection functions
    and dependence between samples are understood?
 
-## 14. References
+---
+
+## 📚 Foundational Literature and References
 
 - Cheng, T.-Y., et al. (2021). *Galaxy Morphological Classification Catalogue
   of the Dark Energy Survey Year 3 Data with Convolutional Neural Networks*.
@@ -658,10 +695,14 @@ figures, execution-specific metadata, or large extracted data.
   Classifications to Their Limits with the Dark Energy Survey*. The catalogue
   definitions used here follow Table 6.
 
-## 15. Scope of the conclusions
+---
+
+## 📍 Scope of the Conclusions
 
 The notebook establishes a validated and reproducible description of the two
 supplied morphology cross-matches. It does not yet establish why the catalogue
 distributions differ. That distinction—between a reproducible measured
 association and a physical causal explanation—is the central methodological
 reason for the workflow documented here.
+
+*Viva a ciência brasileira!* 🇧🇷🔬
