@@ -135,3 +135,63 @@ def test_notebook_plotting_imports_are_matplotlib_only():
 
     assert "matplotlib" in imported_roots
     assert "seaborn" not in imported_roots
+
+
+def test_front_half_has_executable_analysis_cells():
+    """Catch a narrative front half that is not connected to real analysis."""
+
+    cell_ids = {cell.id for cell in load_notebook().cells}
+    required = {
+        "configuration",
+        "load-and-validate-catalogues",
+        "prepare-robust-summaries",
+        "figure-01-composition",
+        "figure-01-interpretation",
+        "figure-02-confidence",
+        "figure-02-interpretation",
+        "figure-03-disagreement",
+        "figure-03-interpretation",
+    }
+    assert required <= cell_ids
+
+
+def test_configuration_resolves_project_and_reproducibility_constants(monkeypatch):
+    """Catch a notebook tied to one launch directory or machine path."""
+
+    monkeypatch.setenv("GALAXY_PROJECT_ROOT", str(Path.cwd()))
+    notebook = load_notebook()
+    source = next(cell.source for cell in notebook.cells if cell.id == "configuration")
+    namespace = {}
+
+    exec(source, namespace)
+
+    assert namespace["PROJECT_ROOT"] == Path.cwd().resolve()
+    assert namespace["SEED"] == 20260713
+    assert namespace["MAX_SEPARATION_ARCSEC"] == 1.0
+    assert namespace["FLUX_RADIUS_CUT"] == 50.0
+    assert namespace["PLOT_SAMPLE_SIZE"] == 100_000
+    assert namespace["FIGURE_ROOT"] == (
+        Path.cwd().resolve() / "outputs" / "meeting-2026-07-13" / "figures"
+    )
+
+
+def test_completed_front_half_contains_no_incomplete_execution_guards():
+    """Catch committed front-half cells that deliberately stop execution."""
+
+    notebook = load_notebook()
+    stop_index = next(
+        index for index, cell in enumerate(notebook.cells) if cell.id == "brightness-size"
+    )
+    for cell in notebook.cells[:stop_index]:
+        if cell.cell_type != "code":
+            continue
+        tree = ast.parse(cell.source)
+        incomplete_raises = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Raise)
+            and isinstance(node.exc, ast.Call)
+            and isinstance(node.exc.func, ast.Name)
+            and node.exc.func.id == "NotImplementedError"
+        ]
+        assert incomplete_raises == []
