@@ -172,8 +172,9 @@ def test_separation_interpretation_reports_percentiles_and_angular_limit():
         maximum_arcsec=1.0,
     )
 
-    assert "median (95th percentile)" in text
-    assert "0.2 (0.29) arcsec for highlum" in text
+    assert "median, 95th percentile, and maximum" in text
+    assert "0.2, 0.29, and 0.3 arcsec for highlum" in text
+    assert "0.4, 0.58, and 0.6 arcsec for highdens" in text
     assert "1 arcsec angular tolerance" in text
     assert "not a physical distance" in text
 

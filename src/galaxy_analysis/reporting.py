@@ -267,11 +267,13 @@ def separation_interpretation(
 
     highlum_valid, highdens_valid = prepared
     return (
-        "The median (95th percentile) separation is "
-        f"{np.median(highlum_valid):.4g} "
-        f"({np.percentile(highlum_valid, 95):.4g}) arcsec for highlum and "
-        f"{np.median(highdens_valid):.4g} "
-        f"({np.percentile(highdens_valid, 95):.4g}) arcsec for highdens. "
+        "The median, 95th percentile, and maximum separation are "
+        f"{np.median(highlum_valid):.4g}, "
+        f"{np.percentile(highlum_valid, 95):.4g}, and "
+        f"{np.max(highlum_valid):.4g} arcsec for highlum; "
+        f"{np.median(highdens_valid):.4g}, "
+        f"{np.percentile(highdens_valid, 95):.4g}, and "
+        f"{np.max(highdens_valid):.4g} arcsec for highdens. "
         f"All validated rows remain within the adopted {maximum_arcsec:g} "
         "arcsec angular tolerance, which is not a physical distance."
     )
